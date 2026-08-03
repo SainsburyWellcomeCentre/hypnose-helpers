@@ -27,7 +27,7 @@ import sys
 import argparse
 from pathlib import Path
 
-from hypnose_helpers.io.paths import DataLocations
+from hypnose_helpers.io.paths import DataLocations, PROFILES_FILENAME, read_yaml
 
 _ENV_SUFFIXES = ["RAWDATA_ROOT", "DERIVATIVES_ROOT", "SERVER_ROOT", "DATA_ROOT"]
 
@@ -83,8 +83,9 @@ def main(argv=None) -> int:
     ap.add_argument("--list", action="store_true", help="list available profiles")
     ap.add_argument("--config-dir", default="configs", type=Path,
                     help="directory holding data_locations.yml (default: ./configs)")
-    ap.add_argument("--env-prefix", default="HYPNOSE",
-                    help="prefix of the override env vars (default: HYPNOSE; EEG uses HYPNOSE_EEG)")
+    ap.add_argument("--env-prefix", default=None,
+                    help="prefix of the override env vars; defaults to `env_prefix` in "
+                         "data_locations.yml, else HYPNOSE")
     args = ap.parse_args(argv)
 
     config_dir = args.config_dir.resolve()
@@ -92,9 +93,14 @@ def main(argv=None) -> int:
         print(f"No config directory at {config_dir}. Run this from a repo root, or pass --config-dir.")
         return 1
 
+    # The prefix belongs to the dataset, so it is declared in that repo's config rather
+    # than typed on every invocation. Getting it wrong makes --show disagree with what the
+    # library actually resolves, which is worse than useless.
+    env_prefix = args.env_prefix or read_yaml(config_dir / PROFILES_FILENAME).get("env_prefix") or "HYPNOSE"
+
     # data_root only matters for the legacy symlink fallback, which is repo-relative.
     loc = DataLocations(config_dir=config_dir, data_root=config_dir.parent / "data",
-                        env_prefix=args.env_prefix)
+                        env_prefix=env_prefix)
     profiles = loc.load_profiles()
 
     if args.list:
@@ -110,7 +116,7 @@ def main(argv=None) -> int:
 
     if args.show:
         print("Resolved data location:")
-        _print_resolved(loc, args.env_prefix)
+        _print_resolved(loc, env_prefix)
         return 0
 
     if not args.profile:
@@ -121,7 +127,7 @@ def main(argv=None) -> int:
 
     loc.set_active(args.profile)
     print(f"Active data location set to '{args.profile}' (written to {loc._local_path()}).")
-    _print_resolved(loc, args.env_prefix)
+    _print_resolved(loc, env_prefix)
     print("\n(If a Jupyter kernel is running, restart it or call that repo's io.paths.reload() to pick this up.)")
     return 0
 
