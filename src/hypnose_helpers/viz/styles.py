@@ -302,3 +302,50 @@ def nice_x_locator(max_ticks: int | None = None):
     from matplotlib.ticker import MaxNLocator
     n = max_ticks if max_ticks is not None else _PRESENTATION_MAX_XTICKS
     return MaxNLocator(nbins=n or 5, steps=[1, 2, 2.5, 5, 10], integer=True)
+
+
+# --------------------------------------
+# Deterministic, once-per-process application
+# --------------------------------------
+#
+# Moved from hypnose-somnotate `io/style.py` (restructure_2 Phase 2a). It used to reach
+# across repos into hypnose-analysis for `use_style`; now that the styles live here it is
+# simply local, and the ImportError guard that silently produced unstyled figures is gone.
+
+# The style currently applied to this process, or None if none has been applied.
+_applied: str | None = None
+
+
+def ensure_style(style: str | None = "nature", force: bool = False) -> str | None:
+    """Apply a figure style once per process; return what is active.
+
+    Idempotent, so every plotting entry point can call it unconditionally without
+    repeatedly stomping on global state.
+
+    Arguments:
+    ----------
+    style -- style name ("nature", "poster", "presentation"), or None to leave matplotlib
+        alone entirely. Consumers with a configurable default pass that value in.
+
+    force -- re-apply even if the style is already active. Use to switch style mid-session
+        without restarting the kernel.
+
+    Returns:
+    --------
+    The active style name, or None if nothing was applied.
+    """
+    global _applied
+
+    if style is None:
+        return None
+    if _applied == style and not force:
+        return _applied
+
+    use_style(style)
+    _applied = style
+    return _applied
+
+
+def active_style() -> str | None:
+    """Return the style applied by `ensure_style`, without applying anything."""
+    return _applied
