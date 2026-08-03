@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hypnose-helpers"
+version = "0.1.0"
+description = "Modality-agnostic helpers shared across the Hypnose repos: data-location resolution, sub-XXX/ses-YY layout walking, selector parsing, figure styles and saving."
+readme = "README.md"
+# 3.9 because hypnose-eeg-preprocessing is pinned there via pomegranate/somnotate.
+# Every dependency below supports it, so any repo in the family can install this.
+requires-python = ">=3.9"
+
+# Deliberately minimal. A helper that needs a heavy dependency almost certainly
+# knows something about the data and belongs in a modality repo instead.
+dependencies = [
+    "numpy",
+    "pandas",
+    "matplotlib",
+    "pyyaml",
+]
+
+[project.optional-dependencies]
+# Reading provenance back out of a saved PDF. Optional so that *writing* it never
+# costs a dependency -- see read_figure_metadata().
+pdf = ["pypdf"]
+test = ["pytest"]
+
+# Console entry point is declared once cli/set_data_location.py lands (Phase 2a):
+#   [project.scripts]
+#   hypnose-set-data-location = "hypnose_helpers.cli.set_data_location:main"
+# It must live inside the package, not in a repo-root scripts/ dir, or it is
+# unreachable from the consumer repos that install this.
+
+[tool.setuptools.packages.find]
+where = ["src"]
