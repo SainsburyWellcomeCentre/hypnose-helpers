@@ -173,6 +173,11 @@ def save_figure(
             _ax.figure.canvas.draw_idle()
 
     bbox = bbox_inches if bbox_inches is not None else "tight"
-    fig.savefig(out_path, bbox_inches=bbox, dpi=dpi)
+    # Type 42 (TrueType) keeps PDF text editable/searchable; matplotlib's default of
+    # Type 3 does not, and journals reject it. Every style dict sets this, but a caller
+    # that applied no style would otherwise silently emit Type 3 -- so enforce it here,
+    # scoped, rather than relying on a global mutation somewhere upstream.
+    with mpl.rc_context({"pdf.fonttype": 42, "ps.fonttype": 42}):
+        fig.savefig(out_path, bbox_inches=bbox, dpi=dpi)
 
     return out_path
