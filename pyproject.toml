@@ -26,11 +26,10 @@ dependencies = [
 pdf = ["pypdf"]
 test = ["pytest"]
 
-# Console entry point is declared once cli/set_data_location.py lands (Phase 2a):
-#   [project.scripts]
-#   hypnose-set-data-location = "hypnose_helpers.cli.set_data_location:main"
-# It must live inside the package, not in a repo-root scripts/ dir, or it is
-# unreachable from the consumer repos that install this.
+[project.scripts]
+# Inside the package, not a repo-root scripts/ dir, so it is reachable from every
+# environment this is installed into -- that is the point of the tool being shared.
+hypnose-set-data-location = "hypnose_helpers.cli.set_data_location:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
