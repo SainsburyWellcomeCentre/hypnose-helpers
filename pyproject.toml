@@ -21,8 +21,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Reading provenance back out of a saved PDF. Optional so that *writing* it never
-# costs a dependency -- see read_figure_metadata().
+# read_figure_metadata() uses pypdf when it is present, but falls back to a small
+# stdlib parser: matplotlib writes the PDF info dictionary uncompressed, so the
+# provenance is recoverable without it. Install this only to read PDFs written by
+# other tools -- provenance that needs an extra install is provenance nobody reads.
 pdf = ["pypdf"]
 test = ["pytest"]
 

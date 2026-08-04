@@ -15,6 +15,7 @@ import matplotlib as mpl
 
 from .styles import _presentation_active, nice_x_locator, _PRESENTATION_MAX_YTICKS, \
     _PRESENTATION_MAX_XTICKS, _PRES_XTICK_BOXPLOT_LABELSIZE
+from .metadata import build_pdf_metadata, filter_metadata
 
 
 # --------------------------------------
@@ -105,8 +106,10 @@ def save_figure(
     bbox_inches=None,
     clear_legends: bool = False,
     boxplot: bool = False,
+    provenance=None,
+    metadata=None,
 ):
-    """Save a matplotlib figure as PDF into `fig_dir`.
+    """Save a matplotlib figure as PDF into `fig_dir`, with its provenance embedded.
 
     `fig_dir` is required and is where the file lands -- this module knows nothing about
     any dataset's derivatives layout. `subjids`/`dates` only build the filename tags, so
@@ -122,6 +125,16 @@ def save_figure(
     boxplot : bool
         Mark this as a categorical-x figure: under the presentation style its x-tick
         labels are enlarged, since the positions are the most important thing to read.
+    provenance : dict | None
+        A `hypnose_helpers.provenance.provenance()` record to embed. Omitted, the calling
+        frame is inspected instead. Pass it explicitly whenever a wrapper sits between
+        the real plotting function and this call, or frame-walking will name the wrapper
+        -- see `capture_call`.
+    metadata : dict | None
+        Extra PDF info-dictionary entries. Keys outside the PDF standard set are dropped
+        (matplotlib would warn and discard them anyway).
+
+    Recover it later with `hypnose_helpers.viz.metadata.read_figure_metadata(path)`.
     """
     if fig is None:
         raise ValueError("fig cannot be None")
@@ -173,11 +186,23 @@ def save_figure(
             _ax.figure.canvas.draw_idle()
 
     bbox = bbox_inches if bbox_inches is not None else "tight"
+
+    # Provenance is attached to real work, so it must never be the reason a save fails:
+    # a broken frame walk or an unreadable git tree costs the metadata, not the figure.
+    try:
+        info = build_pdf_metadata(
+            save_name, subjids=subjids, dates=dates, provenance=provenance,
+        )
+        info.update(metadata or {})
+        info = filter_metadata(info)
+    except Exception:
+        info = filter_metadata(metadata or {})
+
     # Type 42 (TrueType) keeps PDF text editable/searchable; matplotlib's default of
     # Type 3 does not, and journals reject it. Every style dict sets this, but a caller
     # that applied no style would otherwise silently emit Type 3 -- so enforce it here,
     # scoped, rather than relying on a global mutation somewhere upstream.
     with mpl.rc_context({"pdf.fonttype": 42, "ps.fonttype": 42}):
-        fig.savefig(out_path, bbox_inches=bbox, dpi=dpi)
+        fig.savefig(out_path, bbox_inches=bbox, dpi=dpi, metadata=info)
 
     return out_path
