@@ -30,6 +30,10 @@ MAX_ITEMS = 10
 MAX_STR = 80
 MAX_PARAMS = 15
 
+# How many enclosing function names to keep alongside `function`. Four reaches past a
+# local _save_fig closure and its enclosing analysis function without bloating the blob.
+MAX_CHAIN = 4
+
 # Frames belonging to the saving machinery itself, never the answer to "who plotted this".
 _SKIP_MODULES = (
     "hypnose_helpers.provenance",
@@ -199,10 +203,12 @@ def capture_call(*, skip_modules=(), max_params: int = MAX_PARAMS) -> dict | Non
     Returns ``{"function", "file", "lineno", "params"}``, where ``params`` covers the
     named arguments *and* anything that arrived via ``**kwargs``.
 
-    Frame-walking is inherently fragile -- a thin plotting primitive added later may sit
-    between the real caller and this call, and the answer silently becomes the
-    primitive. Extend ``skip_modules``, or pass an explicit record to `save_figure`,
-    whenever the answer matters. That is why the override exists.
+    Also returns ``chain``: the next few enclosing function names. Frame-walking is
+    inherently fragile -- ``function`` is only ever "the nearest frame we did not skip",
+    and in real code that is often a local ``_save_fig`` closure rather than the analysis
+    that produced the figure. The chain makes the real caller recoverable anyway, which a
+    single frame cannot. Extend ``skip_modules``, or pass an explicit record to
+    `save_figure`, when even that is not enough.
     """
     skip = set(_SKIP_MODULES) | set(skip_modules)
     try:
@@ -210,25 +216,30 @@ def capture_call(*, skip_modules=(), max_params: int = MAX_PARAMS) -> dict | Non
     except Exception:
         return None
     try:
-        for entry in stack[1:]:
-            module = entry.frame.f_globals.get("__name__", "")
-            if module in skip or module.startswith(("importlib", "runpy")):
-                continue
-            return {
-                "function": entry.function,
-                "module": module,
-                "file": Path(entry.filename).name,
-                "path": entry.filename,
-                "lineno": entry.lineno,
-                "params": _frame_params(entry.frame, max_params),
-            }
+        kept = [
+            entry for entry in stack[1:]
+            if (entry.frame.f_globals.get("__name__", "") not in skip)
+            and not entry.frame.f_globals.get("__name__", "").startswith(
+                ("importlib", "runpy"))
+        ]
+        if not kept:
+            return None
+        entry = kept[0]
+        return {
+            "function": entry.function,
+            "module": entry.frame.f_globals.get("__name__", ""),
+            "file": Path(entry.filename).name,
+            "path": entry.filename,
+            "lineno": entry.lineno,
+            "chain": [e.function for e in kept[:MAX_CHAIN]],
+            "params": _frame_params(entry.frame, max_params),
+        }
     except Exception:
         return None
     finally:
         # inspect.stack() holds frame references; dropping them promptly keeps large
         # plotting locals from being kept alive by a reference cycle.
         del stack
-    return None
 
 
 def _frame_params(frame, max_params: int) -> dict:
@@ -278,8 +289,8 @@ def provenance(*, anchor=None, call: dict | None = None, extra: dict | None = No
     }
     if call is not None:
         record.update(
-            {k: call[k] for k in ("function", "module", "file", "lineno", "params")
-             if k in call}
+            {k: call[k] for k in
+             ("function", "module", "file", "lineno", "chain", "params") if k in call}
         )
     if extra:
         record.update(extra)
@@ -288,5 +299,5 @@ def provenance(*, anchor=None, call: dict | None = None, extra: dict | None = No
 
 __all__ = [
     "provenance", "git_commit", "package_version", "summarize_value", "capture_call",
-    "MAX_ITEMS", "MAX_STR", "MAX_PARAMS",
+    "MAX_ITEMS", "MAX_STR", "MAX_PARAMS", "MAX_CHAIN",
 ]

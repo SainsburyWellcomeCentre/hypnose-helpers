@@ -293,6 +293,38 @@ def test_a_wrapper_can_exclude_itself():
     assert skipped["function"] == "real_plotter"   # what we actually want
 
 
+def test_chain_reaches_past_an_inner_save_closure():
+    """The real case from movement_analysis_utils: a nested `_save_fig` helper.
+
+    `function` can only ever be "the nearest frame we did not skip", and in real
+    plotting code that is often a local closure rather than the analysis that produced
+    the figure. The chain is what makes the enclosing function recoverable.
+    """
+    def run_movement_stats_batch():
+        def _save_fig():  # the closure that actually calls save_figure
+            return provenance()
+        return _save_fig()
+
+    record = run_movement_stats_batch()
+    assert record["function"] == "_save_fig"
+    assert record["chain"][:2] == ["_save_fig", "run_movement_stats_batch"]
+    assert "test_chain_reaches_past_an_inner_save_closure" in record["chain"]
+
+
+def test_chain_survives_the_pdf_round_trip():
+    with tempfile.TemporaryDirectory() as tmp:
+        def analysis():
+            def _save_fig():
+                fig, ax = plt.subplots()
+                path = save_figure(fig, "x", fig_dir=tmp, subjids=1)
+                plt.close(fig)
+                return path
+            return _save_fig()
+
+        got = read_figure_metadata(analysis())
+        assert got["chain"][:2] == ["_save_fig", "analysis"]
+
+
 def test_blob_stays_ascii_so_the_pdf_string_encoding_is_predictable():
     """Any non-ASCII character makes matplotlib write the string as UTF-16BE.
 
