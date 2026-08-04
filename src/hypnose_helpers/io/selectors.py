@@ -36,6 +36,24 @@ def flatten(values) -> list[str]:
     return out
 
 
+def parse_subject(value) -> int:
+    """Normalise ONE subject argument to a plain integer.
+
+    Accepts 66, "66", "066", "sub-66" and "sub-066". The scalar form exists because
+    `normalize_subjid` and the layout walker want a single subject, and a second
+    hand-rolled copy of this rule is how the two would drift apart.
+    """
+    token = str(value).strip()
+    cleaned = token.lower()
+    if cleaned.startswith("sub-"):
+        cleaned = cleaned[4:]
+    if not cleaned.isdigit():
+        raise ValueError(
+            f"Invalid subject {token!r}; expected a number like 66, 066 or sub-066."
+        )
+    return int(cleaned)
+
+
 def parse_subjects(values) -> list[int]:
     """Normalise subject arguments to plain integers.
 
@@ -45,17 +63,54 @@ def parse_subjects(values) -> list[int]:
     """
     subjects: list[int] = []
     for token in flatten(values):
-        cleaned = token.lower()
-        if cleaned.startswith("sub-"):
-            cleaned = cleaned[4:]
-        if not cleaned.isdigit():
-            raise ValueError(
-                f"Invalid subject {token!r}; expected a number like 66, 066 or sub-066."
-            )
-        subject = int(cleaned)
+        subject = parse_subject(token)
         if subject not in subjects:
             subjects.append(subject)
     return subjects
+
+
+def parse_sessions(values) -> list[int]:
+    """Normalise session arguments to plain integers.
+
+    Accepts 3, "3", "03", "ses-03", and any comma/space separated combination. `ses`
+    is an identifier rather than an ordinal (it has gaps and is occasionally out of
+    chronological order), so it is kept as the number written on the directory.
+    """
+    sessions: list[int] = []
+    for token in flatten(values):
+        cleaned = token.lower()
+        if cleaned.startswith("ses-"):
+            cleaned = cleaned[4:]
+        if not cleaned.isdigit():
+            raise ValueError(
+                f"Invalid session {token!r}; expected a number like 3, 03 or ses-03."
+            )
+        session = int(cleaned)
+        if session not in sessions:
+            sessions.append(session)
+    return sessions
+
+
+def parse_session_range(value) -> tuple[int, int] | None:
+    """Parse an inclusive session range into (start, end).
+
+    Accepts "03-09", "3,9" and a 2-element sequence. Bounds are sorted, matching
+    `parse_date_range`, so an inverted range still selects the intended span.
+    """
+    if value is None:
+        return None
+    if isinstance(value, (list, tuple)) and len(value) == 2:
+        parts = [str(v).strip() for v in value]
+    else:
+        parts = [p for p in _RANGE_SPLIT_RE.split(str(value).strip()) if p]
+
+    if len(parts) != 2:
+        raise ValueError(
+            f"Invalid session range {value!r}; expected START,END or START-END "
+            "(e.g. 3,9 or 03-09)."
+        )
+    start, end = sorted(parse_sessions([p])[0] for p in parts)
+    return start, end
 
 
 def parse_dates(values) -> list[str]:
