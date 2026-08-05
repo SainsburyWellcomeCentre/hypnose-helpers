@@ -222,6 +222,77 @@ def test_empty_selector_matches_nothing_but_none_matches_everything():
         assert len(layout.find_sessions(66)) == 5
 
 
+def test_index_selects_the_first_n_sessions_across_cohorts():
+    """The case `ses` cannot express: "each subject's first 9 sessions".
+
+    `ses` is the number on the directory. It has holes, and for a subject whose
+    numbering carried over from an earlier protocol it does not start near 1 -- so
+    `ses` 1-9 returns 9, 3 and 0 sessions for these three animals, while index 1-9
+    returns 9 each, spanning cohorts recorded months apart.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        make_tree(root, {
+            # contiguous numbering
+            "sub-040_id-1": [f"ses-{n:03d}_date-202511{n:02d}" for n in range(1, 13)],
+            # gaps in ses
+            "sub-057_id-2": [f"ses-{n:03d}_date-202607{i:02d}" for i, n in
+                             enumerate([1, 3, 7, 12, 15, 19, 24, 30, 38, 41], start=1)],
+            # numbering continued from an earlier protocol
+            "sub-062_id-3": [f"ses-{n:03d}_date-202607{i:02d}" for i, n in
+                             enumerate(range(38, 48), start=1)],
+        })
+        layout = SessionLayout(root, name="test", subject_pattern="{subject}_id-*")
+
+        by_ses = {s: len(layout.find_sessions(s, ses="01-09")) for s, _ in layout.iter_subjects()}
+        assert by_ses == {40: 9, 57: 3, 62: 0}
+
+        by_index = {s: layout.find_sessions(s, index_range=(1, 9))
+                    for s, _ in layout.iter_subjects()}
+        assert {s: len(v) for s, v in by_index.items()} == {40: 9, 57: 9, 62: 9}
+        # ...and they really are each animal's first nine, chronologically.
+        for refs in by_index.values():
+            assert sorted(r.session_index for r in refs) == list(range(1, 10))
+        assert by_index[40][0].date.startswith("202511")   # different cohorts
+        assert by_index[62][0].date.startswith("202607")
+
+
+def test_index_selector_forms():
+    with tempfile.TemporaryDirectory() as tmp:
+        layout = _sample_layout(Path(tmp))  # ses 1,2,5,9,12 over 5 dates
+        idx = lambda **kw: [s.session_index for s in layout.find_sessions(66, **kw)]  # noqa: E731
+
+        assert idx(index=1) == [1]
+        assert idx(index="2,4") == [2, 4]
+        assert idx(index="2-4") == [2, 3, 4]
+        assert idx(index_range=(2, 4)) == [2, 3, 4]
+        assert idx(index_range=(None, 2)) == [1, 2]
+        assert idx(index_range=(4, None)) == [4, 5]
+        assert idx(index=[]) == []
+        assert idx(index=None) == [1, 2, 3, 4, 5]
+        # index and ses intersect like every other pair of filters
+        assert idx(index_range=(1, 3), ses_range=(2, 12)) == [2, 3]
+        # a ses- prefix is meaningless for an index and must be refused
+        try:
+            layout.find_sessions(66, index="ses-01")
+        except ValueError:
+            return
+        raise AssertionError("index must not accept a ses- prefix")
+
+
+def test_index_is_the_full_history_rank_even_after_date_filtering():
+    """Filtering by date first must not renumber the index.
+
+    Otherwise "first nine sessions" would silently mean "first nine of what is left",
+    which is not comparable across subjects -- the entire point of the key.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        layout = _sample_layout(Path(tmp))
+        late = layout.find_sessions(66, date_range=("20260712", "20260801"))
+        assert [s.session_index for s in late] == [3, 4, 5]
+        assert filter_sessions(late, index_range=(1, 2)) == []
+
+
 def test_session_index_by_either_key():
     with tempfile.TemporaryDirectory() as tmp:
         layout = _sample_layout(Path(tmp))

@@ -69,34 +69,23 @@ def parse_subjects(values) -> list[int]:
     return subjects
 
 
-def parse_sessions(values) -> list[int]:
-    """Normalise session arguments to plain integers.
-
-    Accepts 3, "3", "03", "ses-03", and any comma/space separated combination. `ses`
-    is an identifier rather than an ordinal (it has gaps and is occasionally out of
-    chronological order), so it is kept as the number written on the directory.
-    """
-    sessions: list[int] = []
+def _parse_ints(values, *, prefix: str | None, label: str, example: str) -> list[int]:
+    """Shared body for the integer selectors. Duplicates removed, order preserved."""
+    out: list[int] = []
     for token in flatten(values):
         cleaned = token.lower()
-        if cleaned.startswith("ses-"):
-            cleaned = cleaned[4:]
+        if prefix and cleaned.startswith(prefix):
+            cleaned = cleaned[len(prefix):]
         if not cleaned.isdigit():
-            raise ValueError(
-                f"Invalid session {token!r}; expected a number like 3, 03 or ses-03."
-            )
-        session = int(cleaned)
-        if session not in sessions:
-            sessions.append(session)
-    return sessions
+            raise ValueError(f"Invalid {label} {token!r}; expected a number like {example}.")
+        number = int(cleaned)
+        if number not in out:
+            out.append(number)
+    return out
 
 
-def parse_session_range(value) -> tuple[int, int] | None:
-    """Parse an inclusive session range into (start, end).
-
-    Accepts "03-09", "3,9" and a 2-element sequence. Bounds are sorted, matching
-    `parse_date_range`, so an inverted range still selects the intended span.
-    """
+def _parse_int_range(value, *, parse, label: str, example: str) -> tuple[int, int] | None:
+    """Shared body for the integer ranges. Bounds are sorted, as `parse_date_range` does."""
     if value is None:
         return None
     if isinstance(value, (list, tuple)) and len(value) == 2:
@@ -106,11 +95,48 @@ def parse_session_range(value) -> tuple[int, int] | None:
 
     if len(parts) != 2:
         raise ValueError(
-            f"Invalid session range {value!r}; expected START,END or START-END "
-            "(e.g. 3,9 or 03-09)."
+            f"Invalid {label} range {value!r}; expected START,END or START-END "
+            f"(e.g. {example})."
         )
-    start, end = sorted(parse_sessions([p])[0] for p in parts)
+    start, end = sorted(parse([p])[0] for p in parts)
     return start, end
+
+
+def parse_sessions(values) -> list[int]:
+    """Normalise session arguments to plain integers.
+
+    Accepts 3, "3", "03", "ses-03", and any comma/space separated combination. `ses`
+    is an identifier rather than an ordinal (it has gaps and is occasionally out of
+    chronological order), so it is kept as the number written on the directory.
+    """
+    return _parse_ints(values, prefix="ses-", label="session", example="3, 03 or ses-03")
+
+
+def parse_session_range(value) -> tuple[int, int] | None:
+    """Parse an inclusive session range into (start, end).
+
+    Accepts "03-09", "3,9" and a 2-element sequence.
+    """
+    return _parse_int_range(value, parse=parse_sessions, label="session",
+                            example="3,9 or 03-09")
+
+
+def parse_indices(values) -> list[int]:
+    """Normalise session-*index* arguments to plain integers.
+
+    The index is the subject's gap-free chronological rank (1..N), not the number in
+    the directory name -- so unlike `parse_sessions` a ``ses-`` prefix is not accepted
+    here. Mixing the two up is the whole reason they are separate selectors: for a
+    subject whose numbering carried over from an earlier protocol, `ses` 1-9 selects
+    nothing while index 1-9 selects its first nine sessions.
+    """
+    return _parse_ints(values, prefix=None, label="session index", example="1 or 9")
+
+
+def parse_index_range(value) -> tuple[int, int] | None:
+    """Parse an inclusive session-index range into (start, end)."""
+    return _parse_int_range(value, parse=parse_indices, label="session index",
+                            example="1,9 or 1-9")
 
 
 def parse_dates(values) -> list[str]:

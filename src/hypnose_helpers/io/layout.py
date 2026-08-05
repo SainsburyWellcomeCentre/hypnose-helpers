@@ -43,7 +43,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Iterable, List, Optional, Sequence, Tuple, Union
 
-from .selectors import parse_dates, parse_date_range, parse_sessions, parse_session_range
+from .selectors import (
+    parse_dates, parse_date_range, parse_index_range, parse_indices,
+    parse_sessions, parse_session_range,
+)
 
 # `sub-066` or `sub-066_id-123`; the `_id-*` suffix is not used to select anything.
 SUBJECT_DIR_RE = re.compile(r"^sub-(\d+)(?:_|$)")
@@ -192,29 +195,52 @@ def filter_sessions(
     *,
     ses=None,
     date=None,
+    index=None,
     ses_range=None,
     date_range=None,
+    index_range=None,
 ) -> List[SessionRef]:
     """Narrow a session list. Every filter supplied must match (they intersect).
 
-    ``ses`` and ``date`` accept a single value, a list, a comma-separated string, or an
-    inclusive ``A-B`` range -- a bare `ses` number and a bare YYYYMMDD date both lack a
-    hyphen, so the range form is never ambiguous. ``ses_range`` / ``date_range`` are the
-    explicit forms, and also accept a 2-tuple whose bounds may be None (unbounded).
+    Three interchangeable keys, answering different questions:
+
+    ``ses``
+        the number written on the directory. Stable, and what you quote in a lab book.
+    ``date``
+        the session date, ``YYYYMMDD``.
+    ``index``
+        the subject's gap-free chronological rank, 1..N -- "its first nine sessions",
+        comparable across animals recorded months apart. `ses` cannot express that: it
+        has holes, and for a subject whose numbering carried over from an earlier
+        protocol it does not start near 1 at all.
+
+    Each accepts a single value, a list, a comma-separated string, or an inclusive
+    ``A-B`` range -- a bare `ses`, index or YYYYMMDD date all lack a hyphen, so the
+    range form is never ambiguous. The ``*_range`` arguments are the explicit forms,
+    and also accept a 2-tuple whose bounds may be None (unbounded).
 
     ``None`` means "do not filter on this"; an **empty** list means "match nothing".
     The distinction is load-bearing -- callers build date lists per subject, and a
     subject with no requested dates must yield no sessions rather than all of them.
+
+    Note ``index`` is read off each `SessionRef`, and those are ranked over the
+    subject's *whole* history when the list is built. So filtering by date first and
+    index second still means "of this animal's first nine sessions", not "the first
+    nine of what is left" -- which is what makes it comparable across subjects.
     """
     result = list(sessions)
 
     ses_values, ses_bounds = _split_selector(ses, parse_sessions, parse_session_range)
     date_values, date_bounds = _split_selector(date, parse_dates, parse_date_range)
+    index_values, index_bounds = _split_selector(index, parse_indices, parse_index_range)
 
     if ses_range is not None:
         ses_bounds = _merge_bounds(ses_bounds, _coerce_range(ses_range, parse_session_range))
     if date_range is not None:
         date_bounds = _merge_bounds(date_bounds, _coerce_range(date_range, parse_date_range))
+    if index_range is not None:
+        index_bounds = _merge_bounds(index_bounds,
+                                     _coerce_range(index_range, parse_index_range))
 
     if ses_values is not None:
         wanted = set(ses_values)
@@ -235,6 +261,16 @@ def filter_sessions(
         result = [
             s for s in result
             if (low is None or s.date >= low) and (high is None or s.date <= high)
+        ]
+    if index_values is not None:
+        wanted = set(index_values)
+        result = [s for s in result if s.session_index in wanted]
+    if index_bounds is not None:
+        low, high = index_bounds
+        result = [
+            s for s in result
+            if (low is None or s.session_index >= low)
+            and (high is None or s.session_index <= high)
         ]
     return result
 
@@ -397,8 +433,10 @@ class SessionLayout:
         *,
         ses=None,
         date=None,
+        index=None,
         ses_range=None,
         date_range=None,
+        index_range=None,
         missing_ok: bool = False,
     ) -> List[SessionRef]:
         """Sessions for one subject, optionally narrowed by `ses` and/or date.
@@ -412,23 +450,25 @@ class SessionLayout:
             return []
         sessions = list_sessions(subject_dir, subjid=parse_subject(subjid))
         return filter_sessions(
-            sessions, ses=ses, date=date, ses_range=ses_range, date_range=date_range
+            sessions, ses=ses, date=date, index=index, ses_range=ses_range,
+            date_range=date_range, index_range=index_range,
         )
 
-    def find_session(self, subjid, *, ses=None, date=None) -> SessionRef:
+    def find_session(self, subjid, *, ses=None, date=None, index=None) -> SessionRef:
         """Exactly one session, or raise.
 
         The point-lookup form: the ~10 sites that resolved a subject and a date to a
         single directory. Reports the available sessions on a miss, as the better of
         the previous implementations did.
         """
-        matches = self.find_sessions(subjid, ses=ses, date=date)
+        matches = self.find_sessions(subjid, ses=ses, date=date, index=index)
         if len(matches) == 1:
             return matches[0]
 
         subject = normalize_subjid(subjid)
         wanted = ", ".join(
-            f"{k}={v!r}" for k, v in (("ses", ses), ("date", date)) if v is not None
+            f"{k}={v!r}" for k, v in (("ses", ses), ("date", date), ("index", index))
+            if v is not None
         ) or "any session"
         if not matches:
             available = [
