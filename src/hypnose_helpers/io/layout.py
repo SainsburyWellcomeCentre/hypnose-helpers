@@ -25,7 +25,10 @@ does exactly that, per session, via an env var plus ``cache_clear()``.
 
 Selection is forgiving in the way the CLI already is (``66`` / ``"066"`` / ``"sub-066"`` /
 ``"66,67"``), and `ses` and `date` are interchangeable selectors because the directory
-name carries both.
+name carries both -- though only `ses` is guaranteed unique per subject. A lab that runs
+two sessions in one day produces two directories sharing a date on purpose, so a repeated
+date is not by itself a tree error; selecting by that date *is* ambiguous, and raises at
+the point of selection (`find_session`) rather than while just listing sessions.
 
 Ordering, deliberately kept as two separate things:
 
@@ -129,8 +132,11 @@ def list_sessions(subject_dir: Union[str, Path], *, subjid: Optional[int] = None
     """Every session under ``subject_dir``, in directory-name order, index-annotated.
 
     Unparseable directory names are skipped, not raised on -- a stray folder in a
-    subject directory is not an error. Genuine ambiguity *is*: a repeated `ses` or a
-    repeated date raises `DuplicateSessionError`.
+    subject directory is not an error. A repeated `ses` *is* raised on immediately: two
+    directories cannot sanely claim the same session number. A repeated date is not
+    raised on here -- two sessions can legitimately share a calendar date -- but makes
+    that date an ambiguous selector; `find_session` raises `DuplicateSessionError` at
+    the point such a selection actually resolves to more than one session.
     """
     subject_dir = Path(subject_dir)
     if subjid is None:
@@ -173,21 +179,26 @@ def list_sessions(subject_dir: Union[str, Path], *, subjid: Optional[int] = None
 
 
 def _reject_duplicates(subject: str, found: Sequence[Tuple[Optional[int], str, Path]]) -> None:
-    """Raise if any `ses` or any date appears twice among ``found``."""
-    for label, key_index in (("ses", 0), ("date", 1)):
-        seen: dict = {}
-        for entry in found:
-            key = entry[key_index]
-            if key is None:  # a non-numeric session token cannot collide meaningfully
-                continue
-            if key in seen:
-                raise DuplicateSessionError(
-                    f"{subject} has two directories with the same {label} "
-                    f"{key!r}:\n  {seen[key]}\n  {entry[2]}\n"
-                    "Selecting either one silently would make the result unexplainable; "
-                    "fix the tree instead."
-                )
-            seen[key] = entry[2]
+    """Raise if any `ses` appears twice among ``found``.
+
+    Only `ses` is checked here: it is the number written on the directory, so two
+    directories sharing one are an unrecoverable tree error. A repeated date is not
+    checked here -- two genuine sessions can share a calendar date -- and is instead
+    caught by `find_session` when a caller actually selects by that date and it
+    resolves to more than one session.
+    """
+    seen: dict = {}
+    for ses, _date, path in found:
+        if ses is None:  # a non-numeric session token cannot collide meaningfully
+            continue
+        if ses in seen:
+            raise DuplicateSessionError(
+                f"{subject} has two directories with the same ses {ses!r}:\n  "
+                f"{seen[ses]}\n  {path}\n"
+                "Selecting either one silently would make the result unexplainable; "
+                "fix the tree instead."
+            )
+        seen[ses] = path
 
 
 def filter_sessions(
