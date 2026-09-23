@@ -40,7 +40,8 @@ src/hypnose_helpers/
 │   ├── styles.py       nature / poster / presentation styles, use_style, ensure_style
 │   └── save.py         save_figure(…, fig_dir=…), strip_legends, set_size
 ├── cli/
-│   └── set_data_location.py
+│   ├── set_data_location.py
+│   └── selector_args.py  add_selector_args: shared -s/--sub/--subjids, -d/--date(s), --ses… flags
 └── provenance.py       git commit (+dirty) and package version, for figure metadata
                         and run manifests alike
 ```
