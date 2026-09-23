@@ -4,6 +4,7 @@ Every spelling someone might reach for selects the same thing, so nobody has to
 remember which script wants ``--sub`` and which ``--subjids``:
 
     subjects      -s  --sub --subs --subj --subject --subjects --subjid --subjids
+    subject range     --sub-range --subj-range --subject-range --subjid-range ...
     dates         -d  --date --dates
     date range        --date-range --dates-range
     sessions          --ses --session --sessions
@@ -16,6 +17,8 @@ remember which script wants ``--sub`` and which ``--subjids``:
 - Values may be space- or comma-separated and zero-padded: ``60 61``, ``60,61``,
   ``060 061``, ``sub-060``.
 - Ranges take ``START END``, ``START-END`` or ``START,END``.
+- A subject range expands into the subject list (``--sub-range 60-66`` = ``-s 60 ... 66``)
+  and combines with ``-s``; ids with no data are skipped by the caller's validation.
 - Values are parsed here with `hypnose_helpers.io.selectors`, so a typo fails at the
   command line rather than mid-run; repeating a list flag appends.
 """
@@ -31,11 +34,13 @@ from hypnose_helpers.io.selectors import (
     parse_indices,
     parse_session_range,
     parse_sessions,
+    parse_subject_range,
     parse_subjects,
 )
 
 SUBJECT_FLAGS = ("-s", "--sub", "--subs", "--subj", "--subject", "--subjects", "--subjid",
                  "--subjids")
+SUBJECT_RANGE_FLAGS = tuple(f"{f}-range" for f in SUBJECT_FLAGS if f.startswith("--"))
 DATE_FLAGS = ("-d", "--date", "--dates")
 DATE_RANGE_FLAGS = ("--date-range", "--dates-range")
 SES_FLAGS = ("--ses", "--session", "--sessions")
@@ -78,13 +83,17 @@ def _one_range(parse):
     return lambda values: parse(values[0] if len(values) == 1 else values)
 
 
-def _add(parser, flags, *, dest, parse, accumulate, metavar, help, required=False):
+def _expand_subject_range(values) -> list[int]:
+    start, end = _one_range(parse_subject_range)(values)
+    return list(range(start, end + 1))
+
+
+def _add(parser, flags, *, dest, parse, accumulate, metavar, help):
     if not accumulate:
         parse = _one_range(parse)
     parser.add_argument(
         *_with_single_dash(flags), dest=dest, nargs="+", default=None, metavar=metavar,
-        action=_ParseAction, parse=parse, accumulate=accumulate, required=required,
-        help=help,
+        action=_ParseAction, parse=parse, accumulate=accumulate, help=help,
     )
 
 
@@ -113,13 +122,18 @@ def add_selector_args(
 ) -> None:
     """Add the subject/date(/session/index) flags to `parser`.
 
-    Parsed values land on the namespace as `subjids` (list[int]), `dates` (list[str]),
+    Parsed values land on the namespace as `subjids` (list[int], including any
+    ``--sub-range``), `dates` (list[str]),
     `date_range` (tuple[str, str]), `ses` (list[int]), `ses_range`, `index` and
     `index_range` (ints); an absent flag is ``None``. The selectors intersect.
     """
     _compact_help(parser)
-    _add(parser, SUBJECT_FLAGS, dest="subjids", parse=parse_subjects, accumulate=True,
-         metavar="ID", required=subjects_required, help=subjects_help)
+    # Required means "-s or --sub-range", which argparse can only express as a group.
+    subjects = parser.add_mutually_exclusive_group(required=True) if subjects_required else parser
+    _add(subjects, SUBJECT_FLAGS, dest="subjids", parse=parse_subjects, accumulate=True,
+         metavar="ID", help=subjects_help)
+    _add(subjects, SUBJECT_RANGE_FLAGS, dest="subjids", parse=_expand_subject_range,
+         accumulate=True, metavar="ID", help="inclusive subject range: START END")
     _add(parser, DATE_FLAGS, dest="dates", parse=parse_dates, accumulate=True,
          metavar="YYYYMMDD", help="specific date(s)")
     _add(parser, DATE_RANGE_FLAGS, dest="date_range", parse=parse_date_range,

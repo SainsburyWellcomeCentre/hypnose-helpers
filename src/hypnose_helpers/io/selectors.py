@@ -69,6 +69,15 @@ def parse_subjects(values) -> list[int]:
     return subjects
 
 
+def parse_subject_range(value) -> tuple[int, int] | None:
+    """Parse an inclusive subject range into (start, end).
+
+    Accepts "60-66", "060,066" and a 2-element sequence.
+    """
+    return _parse_int_range(value, parse=parse_subjects, label="subject",
+                            example="60,66 or 60-66")
+
+
 def _parse_ints(values, *, prefix: str | None, label: str, example: str) -> list[int]:
     """Shared body for the integer selectors. Duplicates removed, order preserved."""
     out: list[int] = []
