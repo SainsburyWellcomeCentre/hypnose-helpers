@@ -187,6 +187,10 @@ _PRESENTATION_MAX_YTICKS = 4
 # Configurable via use_presentation_style(max_xticks=...).
 _PRESENTATION_MAX_XTICKS = 5
 
+# Whether plotters that route their legends through `viz.legends` set them apart in a
+# legend-only figure; set by `use_style`.
+_SEPARATE_LEGENDS = False
+
 
 def presentation_style() -> dict:
     """Return rcParams dict for 'presentation' figures (projector-friendly).
@@ -267,7 +271,8 @@ def _resolve_style(style) -> dict:
     raise TypeError(f"style must be a callable, dict, or name string, got {type(style)!r}")
 
 
-def use_style(style="nature", max_yticks: int = 4, max_xticks: int = 5) -> None:
+def use_style(style="nature", max_yticks: int = 4, max_xticks: int = 5,
+              separate_legends: bool | None = None) -> None:
     """Activate a figure style globally and set the tick caps.
 
     Call once at the top of a notebook (``use_style()`` for the default nature style,
@@ -278,11 +283,22 @@ def use_style(style="nature", max_yticks: int = 4, max_xticks: int = 5) -> None:
 
     The tick caps only take effect under the presentation style: save_figure detects it
     and caps y-ticks (to ``max_yticks``) and numeric x-ticks (to ``max_xticks``).
+
+    ``separate_legends`` moves legends out of the figures of plotters that support it
+    (`viz.legends`) into one legend-only figure, shown but never saved, for placing on a
+    slide. None turns it on for the presentation style only.
     """
-    global _PRESENTATION_MAX_YTICKS, _PRESENTATION_MAX_XTICKS
+    global _PRESENTATION_MAX_YTICKS, _PRESENTATION_MAX_XTICKS, _SEPARATE_LEGENDS
     _PRESENTATION_MAX_YTICKS = max_yticks
     _PRESENTATION_MAX_XTICKS = max_xticks
     mpl.rcParams.update(_resolve_style(style))
+    _SEPARATE_LEGENDS = (_presentation_active() if separate_legends is None
+                         else bool(separate_legends))
+
+
+def legends_separate() -> bool:
+    """Whether `use_style` set legends apart from their figures."""
+    return _SEPARATE_LEGENDS
 
 
 def use_presentation_style(max_yticks: int = 4, max_xticks: int = 5) -> None:

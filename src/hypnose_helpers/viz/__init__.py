@@ -5,6 +5,12 @@ Planned modules (populated during restructure_2 Phase 2a):
     styles.py  nature_style, poster_style, presentation_style, use_style, ensure_style
     save.py    save_figure(fig, name, *, fig_dir, ...), strip_legends, set_size,
                nice_x_locator
+    plotter.py finish_figure (+ legend_figure, show_suffix, tie): the plotter convention
+               every plotting function follows -- see its docstring
+    legends.py pop_legends, legend_figure: legends set apart from their figures for
+               slides (``use_style(..., separate_legends=...)``)
+    series.py  show_series, show_suffix, tie: a figure's series shown a few at a time,
+               to build a slide up step by step
 
 Two rules this package exists to enforce:
 

@@ -38,7 +38,10 @@ src/hypnose_helpers/
 │   └── tables.py       parquet-vs-CSV dispatch
 ├── viz/
 │   ├── styles.py       nature / poster / presentation styles, use_style, ensure_style
-│   └── save.py         save_figure(…, fig_dir=…), strip_legends, set_size
+│   ├── save.py         save_figure(…, fig_dir=…), strip_legends, set_size
+│   ├── plotter.py      the plotter convention: finish_figure, legend_figure, show_suffix, tie
+│   ├── legends.py      legends set apart from their figures, for slides
+│   └── series.py       a figure's series shown a few at a time, for build-up slides
 ├── cli/
 │   ├── set_data_location.py
 │   └── selector_args.py  add_selector_args: shared -s/--sub/--subjids, -d/--date(s), --ses… flags
@@ -52,6 +55,28 @@ Two design rules the `viz` modules exist to enforce:
    scope means whoever imports last silently wins.
 2. **`save_figure` takes `fig_dir` as an argument.** A library owned by no dataset must not
    hardcode one dataset's layout and then need a resolver hook to escape it.
+
+## Plotter convention
+
+Every plotting function in the family takes `legend=None` and `show=None` and finishes
+each figure with `viz.plotter`, so a figure can be reshaped for slides without the function
+knowing how:
+
+- `legend` -- True keeps the legend in the figure; False sets it apart in one legend-only
+  figure, shown and never saved; None follows `use_style`, which sets legends apart under
+  the presentation style (`use_style(..., separate_legends=...)` overrides).
+- `show` -- the series to draw, by legend number or label in any order (`[1]`, `[1, 2]`,
+  `[3, 1]`), to build a slide up step by step; None draws them all.
+
+```python
+entries += finish_figure(fig, legend, show)        # each figure, before saving
+save_figure(fig, f"name{show_suffix(show)}", ...)  # each step saves apart
+legend_figure(entries)                             # once, after the figures
+```
+
+Draw every series with a label, in a fixed order: legend order is the numbering. An
+artist that belongs to a series without its label (a band, error bars) is tied to it with
+`tie(artist, label)`. The full pattern is in `viz/plotter.py`.
 
 ## Install
 
