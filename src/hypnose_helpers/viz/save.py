@@ -164,15 +164,25 @@ def save_figure(
 
     # presentation style: cap y-ticks (and numeric x-ticks) to a few round
     # values (no rcParam for this), and, for boxplot-style figures, enlarge the
-    # x-tick labels.
+    # x-tick labels. Only linear axes that show ticks: a linear locator on a log axis
+    # puts its ticks at 0, 1000, 2000, ... and bunches them at the top decade, while the
+    # log axis's own decade ticks are few already; and an axis with its ticks switched
+    # off (a colorbar's short side) must stay that way.
     if _presentation_active():
-        from matplotlib.ticker import MaxNLocator, FixedLocator, FixedFormatter
+        from matplotlib.ticker import MaxNLocator, FixedLocator, FixedFormatter, NullLocator
+
+        def _capped(axis, scale):
+            locator = axis.get_major_locator()
+            tickless = isinstance(locator, NullLocator) or (
+                isinstance(locator, FixedLocator) and len(locator.locs) == 0)
+            return scale == "linear" and not tickless
+
         for _ax in fig.axes:
-            if _PRESENTATION_MAX_YTICKS:
+            if _PRESENTATION_MAX_YTICKS and _capped(_ax.yaxis, _ax.get_yscale()):
                 _ax.yaxis.set_major_locator(
                     MaxNLocator(nbins=_PRESENTATION_MAX_YTICKS, steps=[1, 2, 2.5, 5, 10])
                 )
-            if _PRESENTATION_MAX_XTICKS:
+            if _PRESENTATION_MAX_XTICKS and _capped(_ax.xaxis, _ax.get_xscale()):
                 # Only touch a *numeric* x-axis: skip categorical axes (explicit string
                 # labels / fixed ticks), which set a FixedFormatter/FixedLocator.
                 _x_categorical = (
