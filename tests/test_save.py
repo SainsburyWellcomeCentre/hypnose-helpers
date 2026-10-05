@@ -46,6 +46,24 @@ def test_tickless_axes_stay_tickless():
     assert list(bar.ax.get_yticks()) == []
 
 
+def test_titles_false_saves_untitled_and_restores():
+    use_style("nature")
+    fig, (top, bottom) = plt.subplots(2)
+    top.set_title("top")
+    bottom.set_title("left", loc="left")
+    fig.suptitle("figure")
+    texts = [top.title, bottom._left_title, fig._suptitle]
+    at_save = []
+    save = fig.savefig
+    fig.savefig = lambda *a, **k: (at_save.append([t.get_visible() for t in texts]),
+                                   save(*a, **k))
+    with tempfile.TemporaryDirectory() as tmp:
+        save_figure(fig, "titled", fig_dir=tmp)
+        save_figure(fig, "untitled", fig_dir=tmp, titles=False)
+    assert at_save == [[True, True, True], [False, False, False]], at_save
+    assert all(t.get_visible() for t in texts)
+
+
 if __name__ == "__main__":
     tests = [value for name, value in sorted(globals().items()) if name.startswith("test_")]
     for test in tests:

@@ -94,6 +94,20 @@ def strip_legends(fig_or_ax) -> int:
     return removed
 
 
+def _hide_titles(fig) -> list:
+    """Hide ``fig``'s shown titles -- every axes title and the suptitle; returns them.
+
+    matplotlib keeps the suptitle and the left/right axes titles only as private attributes.
+    """
+    texts = [getattr(ax, name, None) for ax in fig.axes
+             for name in ("title", "_left_title", "_right_title")]
+    texts.append(getattr(fig, "_suptitle", None))
+    hidden = [t for t in texts if t is not None and t.get_visible() and t.get_text()]
+    for text in hidden:
+        text.set_visible(False)
+    return hidden
+
+
 def save_figure(
     fig: mpl.figure.Figure,
     save_name: str,
@@ -106,6 +120,7 @@ def save_figure(
     bbox_inches=None,
     clear_legends: bool = False,
     boxplot: bool = False,
+    titles: bool = True,
     provenance=None,
     metadata=None,
 ):
@@ -125,6 +140,9 @@ def save_figure(
     boxplot : bool
         Mark this as a categorical-x figure: under the presentation style its x-tick
         labels are enlarged, since the positions are the most important thing to read.
+    titles : bool
+        False saves the figure without its titles (axes titles and suptitle); the displayed
+        figure keeps them. For slides, where the file's path already names the subject.
     provenance : dict | None
         A `hypnose_helpers.provenance.provenance()` record to embed. Omitted, the calling
         frame is inspected instead. Pass it explicitly whenever a wrapper sits between
@@ -212,7 +230,12 @@ def save_figure(
     # Type 3 does not, and journals reject it. Every style dict sets this, but a caller
     # that applied no style would otherwise silently emit Type 3 -- so enforce it here,
     # scoped, rather than relying on a global mutation somewhere upstream.
-    with mpl.rc_context({"pdf.fonttype": 42, "ps.fonttype": 42}):
-        fig.savefig(out_path, bbox_inches=bbox, dpi=dpi, metadata=info)
+    hidden = [] if titles else _hide_titles(fig)
+    try:
+        with mpl.rc_context({"pdf.fonttype": 42, "ps.fonttype": 42}):
+            fig.savefig(out_path, bbox_inches=bbox, dpi=dpi, metadata=info)
+    finally:
+        for text in hidden:
+            text.set_visible(True)
 
     return out_path

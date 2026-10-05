@@ -6,7 +6,7 @@ error bars or markers drawn without a label of their own. Series are numbered 1,
 legend order, or, in a figure without a legend, in the order they were drawn.
 
 - `show_series(fig, show)` -- show only the series in ``show``; None leaves the figure as
-  drawn, every series shown.
+  drawn, every series shown; 0 shows none, the first frame of a build-up.
 - `show_suffix(show)` -- the save-name suffix of a selection, so each step saves apart.
 
 Hidden artists keep their place, so axis limits and ticks stay the same from step to step,
@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import re
 
-from .legends import _handles
+from .legends import _rows
 
 __all__ = ["show_series", "show_suffix", "tie"]
 
@@ -47,7 +47,8 @@ def _labels(fig) -> list:
 
 
 def _selected(fig, show) -> set:
-    """The labels ``show`` names: series numbers (1-based) or labels, in any order."""
+    """The labels ``show`` names: series numbers (1-based) or labels, in any order; 0 names
+    none."""
     labels = _labels(fig)
     chosen = set()
     for item in [show] if isinstance(show, (int, str)) else show:
@@ -55,7 +56,7 @@ def _selected(fig, show) -> set:
             if item not in labels:
                 raise ValueError(f"no series labelled {item!r}; the series are {labels}")
             chosen.add(item)
-        else:
+        elif int(item) != 0:
             if not 1 <= int(item) <= len(labels):
                 raise ValueError(f"series {item} out of range; the series are "
                                  f"{dict(enumerate(labels, 1))}")
@@ -75,7 +76,8 @@ def show_series(fig, show=None) -> None:
     """Show only the series ``show`` names, and their legend rows; None changes nothing.
 
     ``show`` is a series number, a label, or a list of either, in any order:
-    ``[1]``, ``[1, 2]``, ``[3, 1]``, ``["rewards"]``.
+    ``[1]``, ``[1, 2]``, ``[3, 1]``, ``["rewards"]``. ``0`` shows no series, only the axes
+    and unlabelled artists, as the first frame of a build-up.
     """
     if show is None:
         return
@@ -96,9 +98,10 @@ def show_series(fig, show=None) -> None:
                 for artist in _flatten(container):
                     artist.set_visible(visible(container.get_label()))
     for leg in _legends(fig):
-        for handle, text in zip(_handles(leg), leg.get_texts()):
+        for text, glyph in _rows(leg):
             shown = visible(text.get_text())
-            handle.set_visible(shown)
+            for artist in glyph:
+                artist.set_visible(shown)
             text.set_visible(shown)
 
 

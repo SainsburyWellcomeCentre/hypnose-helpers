@@ -66,7 +66,8 @@ knowing how:
   figure, shown and never saved; None follows `use_style`, which sets legends apart under
   the presentation style (`use_style(..., separate_legends=...)` overrides).
 - `show` -- the series to draw, by legend number or label in any order (`[1]`, `[1, 2]`,
-  `[3, 1]`), to build a slide up step by step; None draws them all.
+  `[3, 1]`), to build a slide up step by step; `0` draws none (the first frame), None draws
+  them all.
 
 ```python
 entries += finish_figure(fig, legend, show)        # each figure, before saving
@@ -76,7 +77,9 @@ legend_figure(entries)                             # once, after the figures
 
 Draw every series with a label, in a fixed order: legend order is the numbering. An
 artist that belongs to a series without its label (a band, error bars) is tied to it with
-`tie(artist, label)`. The full pattern is in `viz/plotter.py`.
+`tie(artist, label)`. The full pattern is in `viz/plotter.py`. Any other key a figure
+sets apart with its legend (a score table, say) is drawn in its own figure and passed to
+`show_apart(fig)`, which shows it like the legend figure and closes it, never saved.
 
 ## Install
 

@@ -17,7 +17,8 @@ knowing how::
 - ``legend`` -- True: in the figure; False: set apart in one legend-only figure, shown and
   never saved; None: as `use_style` says, apart under the presentation style.
 - ``show`` -- the series to draw, by legend number or label in any order, to build a slide
-  up step by step; None draws them all. `show_suffix` keeps each step's file apart.
+  up step by step; 0 draws none (the first frame), None draws them all. `show_suffix` keeps
+  each step's file apart.
 
 Draw every series with a label, in a fixed order: legend order is the numbering ``show``
 uses. An artist that belongs to a series without carrying its label (a band, error bars,

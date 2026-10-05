@@ -65,14 +65,37 @@ def test_labels_and_single_values():
     assert _shown(parts) == {"a": False, "b": True, "c": False}
 
 
+def test_zero_shows_none():
+    fig, parts, reference = _figure()
+    limits = fig.axes[0].get_ylim()
+    show_series(fig, 0)
+    assert _shown(parts) == {"a": False, "b": False, "c": False}
+    assert reference.get_visible()
+    assert fig.axes[0].get_ylim() == limits
+    fig, parts, _ = _figure()
+    show_series(fig, [0, "b"])
+    assert _shown(parts) == {"a": False, "b": True, "c": False}
+    assert show_suffix(0) == "_show-0"
+
+
 def test_bad_selection_raises():
-    for bad in ([4], [0], ["missing"]):
+    for bad in ([4], [-1], ["missing"]):
         fig, _, _ = _figure()
         try:
             show_series(fig, bad)
         except ValueError:
             continue
         raise AssertionError(f"{bad} did not raise")
+
+
+def test_hidden_rows_hide_the_whole_glyph():
+    from hypnose_helpers.viz.legends import _rows
+    fig, _, _ = _figure()
+    show_series(fig, [1])
+    glyphs = {text.get_text(): [a.get_visible() for a in artists]
+              for text, artists in _rows(fig.axes[0].get_legend())}
+    assert len(glyphs["c"]) > 1, "an errorbar's glyph is several artists"
+    assert all(glyphs["a"]) and not any(glyphs["b"]) and not any(glyphs["c"])
 
 
 def test_pop_legends_skips_hidden_rows():
