@@ -130,18 +130,50 @@ def test_duplicate_ses_raises_naming_both():
         raise AssertionError("a repeated ses must raise")
 
 
-def test_duplicate_date_raises():
+def test_duplicate_date_does_not_raise_from_list_sessions():
+    """Two real sessions can share a calendar date (e.g. two sessions in one day) --
+    that is not by itself a tree error, so listing must not raise on it."""
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         make_tree(root, {"sub-036_id-1": [
             "ses-060_date-20260101",
             "ses-061_date-20260101",
         ]})
+        sessions = list_sessions(root / "sub-036_id-1")
+        assert [s.ses for s in sessions] == [60, 61]
+        assert [s.date for s in sessions] == ["20260101", "20260101"]
+
+
+def test_duplicate_date_raises_only_when_selected_by_date():
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        make_tree(root, {"sub-036_id-1": [
+            "ses-060_date-20260101",
+            "ses-061_date-20260101",
+        ]})
+        layout = SessionLayout(root, name="test")
+
         try:
-            list_sessions(root / "sub-036_id-1")
-        except DuplicateSessionError:
-            return
-        raise AssertionError("a repeated date must raise")
+            layout.find_session(36, date="20260101")
+        except DuplicateSessionError as exc:
+            assert "ses-060_date-20260101" in str(exc) and "ses-061_date-20260101" in str(exc)
+        else:
+            raise AssertionError("selecting the shared date must raise")
+
+
+def test_duplicate_date_elsewhere_does_not_block_an_unambiguous_ses_lookup():
+    """The bug this guards: an unrelated same-date pair anywhere in a subject's tree
+    must not block a `ses` lookup that is not itself ambiguous."""
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        make_tree(root, {"sub-066_id-1": [
+            "ses-001_date-20260717",
+            "ses-012_date-20260803",
+            "ses-013_date-20260803",
+        ]})
+        layout = SessionLayout(root, name="test")
+        found = layout.find_session(66, ses=1)
+        assert found.date == "20260717"
 
 
 def test_duplicate_subject_dir_raises():
