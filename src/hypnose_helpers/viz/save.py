@@ -1,21 +1,20 @@
 """Saving figures, and the small utilities around it.
 
-Moved from hypnose-behavior-analysis `io/save.py` (restructure_2 Phase 2a).
-
-`save_figure` takes **`fig_dir` as a required argument**: a library owned by no dataset
-must not hardcode one dataset's derivatives layout and then need a resolver hook to
-escape it. Each consumer resolves its own destination and passes it in. `subjids`/`dates`
-are used only to build the filename tags.
+- The save itself, provenance record included, is `backstamp.save`. `save_figure` adds
+  the Hypnose filename tags, the presentation tick caps, `titles=` and `clear_legends`.
+- `save_figure` takes **`fig_dir` as a required argument**: a library owned by no dataset
+  must not hardcode one dataset's derivatives layout and then need a resolver hook to
+  escape it. Each consumer resolves its own destination and passes it in.
 """
 from __future__ import annotations
 
 from pathlib import Path
 
 import matplotlib as mpl
+from backstamp.save import save as _save
 
 from .styles import _presentation_active, nice_x_locator, _PRESENTATION_MAX_YTICKS, \
     _PRESENTATION_MAX_XTICKS, _PRES_XTICK_BOXPLOT_LABELSIZE
-from .metadata import build_pdf_metadata, filter_metadata
 
 
 # --------------------------------------
@@ -127,8 +126,9 @@ def save_figure(
     """Save a matplotlib figure as PDF into `fig_dir`, with its provenance embedded.
 
     `fig_dir` is required and is where the file lands -- this module knows nothing about
-    any dataset's derivatives layout. `subjids`/`dates` only build the filename tags, so
-    a consumer that resolves its own directory still gets the shared naming convention.
+    any dataset's derivatives layout. `subjids`/`dates` go into the record and build the
+    filename tags, so a consumer that resolves its own directory still gets the shared
+    naming convention.
 
     Parameters
     ----------
@@ -144,7 +144,7 @@ def save_figure(
         False saves the figure without its titles (axes titles and suptitle); the displayed
         figure keeps them. For slides, where the file's path already names the subject.
     provenance : dict | None
-        A `hypnose_helpers.provenance.provenance()` record to embed. Omitted, the calling
+        A `backstamp.provenance.provenance()` record to embed. Omitted, the calling
         frame is inspected instead. Pass it explicitly whenever a wrapper sits between
         the real plotting function and this call, or frame-walking will name the wrapper
         -- see `capture_call`.
@@ -152,7 +152,7 @@ def save_figure(
         Extra PDF info-dictionary entries. Keys outside the PDF standard set are dropped
         (matplotlib would warn and discard them anyway).
 
-    Recover it later with `hypnose_helpers.viz.metadata.read_figure_metadata(path)`.
+    Recover it later with `backstamp.metadata.read_figure_metadata(path)`.
     """
     if fig is None:
         raise ValueError("fig cannot be None")
@@ -173,9 +173,6 @@ def save_figure(
         subdir_path = Path(str(subdir).strip()).as_posix().strip("./")
         if subdir_path:
             fig_dir = fig_dir / subdir_path
-    fig_dir.mkdir(parents=True, exist_ok=True)
-
-    out_path = fig_dir / filename
 
     if clear_legends:
         strip_legends(fig)
@@ -213,29 +210,12 @@ def save_figure(
                 _ax.tick_params(axis="x", labelsize=_PRES_XTICK_BOXPLOT_LABELSIZE)
             _ax.figure.canvas.draw_idle()
 
-    bbox = bbox_inches if bbox_inches is not None else "tight"
-
-    # Provenance is attached to real work, so it must never be the reason a save fails:
-    # a broken frame walk or an unreadable git tree costs the metadata, not the figure.
-    try:
-        info = build_pdf_metadata(
-            save_name, subjids=subjids, dates=dates, provenance=provenance,
-        )
-        info.update(metadata or {})
-        info = filter_metadata(info)
-    except Exception:
-        info = filter_metadata(metadata or {})
-
-    # Type 42 (TrueType) keeps PDF text editable/searchable; matplotlib's default of
-    # Type 3 does not, and journals reject it. Every style dict sets this, but a caller
-    # that applied no style would otherwise silently emit Type 3 -- so enforce it here,
-    # scoped, rather than relying on a global mutation somewhere upstream.
+    # skip_modules: without it the record names this wrapper instead of the plotter.
     hidden = [] if titles else _hide_titles(fig)
     try:
-        with mpl.rc_context({"pdf.fonttype": 42, "ps.fonttype": 42}):
-            fig.savefig(out_path, bbox_inches=bbox, dpi=dpi, metadata=info)
+        return _save(fig, save_name, fig_dir=fig_dir, filename=filename,
+                     subjids=subjids, dates=dates, dpi=dpi, bbox_inches=bbox_inches,
+                     provenance=provenance, metadata=metadata, skip_modules=(__name__,))
     finally:
         for text in hidden:
             text.set_visible(True)
-
-    return out_path

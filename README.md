@@ -38,16 +38,19 @@ src/hypnose_helpers/
 │   └── tables.py       parquet-vs-CSV dispatch
 ├── viz/
 │   ├── styles.py       nature / poster / presentation styles, use_style, ensure_style
-│   ├── save.py         save_figure(…, fig_dir=…), strip_legends, set_size
+│   ├── save.py         save_figure(…, fig_dir=…), strip_legends, set_size; saves through backstamp
 │   ├── plotter.py      the plotter convention: finish_figure, legend_figure, show_suffix, tie
 │   ├── legends.py      legends set apart from their figures, for slides
 │   └── series.py       a figure's series shown a few at a time, for build-up slides
 ├── cli/
 │   ├── set_data_location.py
 │   └── selector_args.py  add_selector_args: shared -s/--sub/--subjids, -d/--date(s), --ses… flags
-└── provenance.py       git commit (+dirty) and package version, for figure metadata
-                        and run manifests alike
+└── provenance.py       backstamp.provenance under this import path (viz/metadata.py
+                        likewise for backstamp.metadata)
 ```
+
+Figure provenance lives in [backstamp](https://github.com/Joschua21/backstamp): the commit,
+calling function and parameters recorded inside each saved PDF.
 
 Two design rules the `viz` modules exist to enforce:
 
@@ -91,7 +94,7 @@ Dependencies are deliberately minimal (`numpy`, `pandas`, `matplotlib`, `pyyaml`
 support Python ≥3.9, so every repo in the family can install it — including those pinned
 to 3.9 by pomegranate/somnotate. 
 
-Optional extras: `pdf` (read figure provenance back out of a saved PDF), `test`.
+Optional extras: `test`.
 
 ## Status
 

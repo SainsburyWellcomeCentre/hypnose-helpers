@@ -18,14 +18,10 @@ dependencies = [
     "pandas",
     "matplotlib",
     "pyyaml",
+    "backstamp @ git+https://github.com/Joschua21/backstamp@v0.0.1",
 ]
 
 [project.optional-dependencies]
-# read_figure_metadata() uses pypdf when it is present, but falls back to a small
-# stdlib parser: matplotlib writes the PDF info dictionary uncompressed, so the
-# provenance is recoverable without it. Install this only to read PDFs written by
-# other tools -- provenance that needs an extra install is provenance nobody reads.
-pdf = ["pypdf"]
 test = ["pytest"]
 
 [project.scripts]

@@ -23,7 +23,7 @@ reads figures already saved by `hypnose-helpers`, since those exist on disk.
 | Phase | What | Estimate | Status |
 | --- | --- | --- | --- |
 | 0 | Settle the open decisions; create the GitHub repo and envs | ½ h (maintainer) | done |
-| 1 | Extract unchanged, with shims in `hypnose-helpers`; publish `0.0.1` | 1 day | — |
+| 1 | Extract unchanged, with shims in `hypnose-helpers`; publish `0.0.1` | 1 day | done |
 | 2 | Make provenance general: any inputs, every parameter, `metadata()` | 2–3 days | — |
 | 3 | Reader: `Record`, `backstamp show` with drag and drop, `backstamp ls` | 1–1½ days | — |
 | 4 | Survival test: where the metadata survives | ½ day + ~1 h (maintainer) | — |
@@ -67,8 +67,6 @@ reads figures already saved by `hypnose-helpers`, since those exist on disk.
 - `provenance.py` and `metadata.py` import nothing from `io/`, `cli/` or `styles`.
 - `save.py` depends on `styles` only through the presentation tick caps, which stay in the
   wrapper. `backstamp` therefore needs nothing from `hypnose-helpers`.
-- `src/hypnose_helpers.egg-info/` is committed. Untrack it in Phase 1 (`git rm --cached` plus a
-  `.gitignore` entry).
 
 ### Consumers outside this repo
 
@@ -272,6 +270,8 @@ accuracy      plot_accuracy   a1b2c3d-dirty  subject=40,45 date=2…   2026-10-0
 ## Phases
 
 Each phase is one chat. Read this plan fresh at the start, and tick the Progress table at the end.
+Each phase brings `backstamp`'s README up to what it adds, written for an end user: the problem
+first, current behaviour only.
 
 ### Phase 0: Decisions (maintainer)
 
@@ -285,13 +285,14 @@ Each phase is one chat. Read this plan fresh at the start, and tick the Progress
     matplotlib 3.10+ needs Python 3.10+.
   - `backstamp-py39` (Python 3.9): `matplotlib` and `pytest` only, to run the tests on the
     floor version (Q8) until Phase 6's CI does it.
-  - Neither has `pypdf`, so the stdlib reader is what gets tested.
+  - `pypdf` is a dependency (Phase 1), so the editable install brings it into each env.
 
 ### Phase 1: Extract unchanged
 
 - Clone `github.com/Joschua21/backstamp` to `~/repos/harris_lab/backstamp` and build the
-  package there: a `src/` layout and `pyproject.toml`. The only dependency is `matplotlib`;
-  `pypdf` is an optional extra.
+  package there: a `src/` layout and `pyproject.toml`. Dependencies: `matplotlib` and `pypdf`.
+  A PDF re-saved by another tool may not keep the info dictionary as the uncompressed literal
+  string the stdlib parser relies on, and Phases 3–4 read exactly those files.
 - The maintainer installs it in editable mode (`pip install -e`) into `backstamp`,
   `backstamp-py39`, and the envs that use `hypnose-helpers`: `hypnose`, `hypnose-behavior`,
   `hypnose-somnotate`.
@@ -299,15 +300,17 @@ Each phase is one chat. Read this plan fresh at the start, and tick the Progress
   becomes `backstamp.*`.
 - Split `save.py` as in the Inventory, moving code only. The `hypnose-helpers` wrapper keeps
   `save_figure`'s current signature and calls `backstamp.save`.
+- `backstamp.save` takes `filename=` as a string; the wrapper passes the Hypnose file name.
 - The wrapper passes its own module name in `skip_modules`, or every record names the wrapper
   instead of the plotting function.
-- Turn `hypnose_helpers/provenance.py` and `hypnose_helpers/viz/metadata.py` into re-export
-  shims, so every current import keeps working.
+- Turn `hypnose_helpers/provenance.py` and `hypnose_helpers/viz/metadata.py` into shims that
+  replace themselves in `sys.modules` with the `backstamp` module. Every current import keeps
+  working, private names included, and so does setting `MAX_CHAIN` through the old name (the
+  gate's `--break-chain` probe). A star re-export would set a copy.
 - `hypnose-helpers` gains the dependency `backstamp @ git+https://…@v0.0.1`.
 - Move `test_provenance.py`; it passes in both `backstamp` and `backstamp-py39`. All
   `hypnose-helpers` tests pass.
 - **Check:** `qc/figure_provenance.py` stays GREEN.
-- Untrack `hypnose_helpers.egg-info/`.
 - Publish `0.0.1` to PyPI. This claims the name (Q1).
   - `python -m build`, then `twine upload dist/*`, as `jgeuter`.
   - The first upload needs an account-wide API token: a project-scoped one can only be made once
@@ -326,7 +329,11 @@ Each phase is one chat. Read this plan fresh at the start, and tick the Progress
   or `PdfPages(..., metadata=…)`. It must be called inside the plotting function, like `save`.
 - `save` and `metadata` accept a figure, an axes object (what `pandas.plot` returns) or a seaborn
   grid (what `relplot`/`catplot` return). Anything else raises a `TypeError` naming what to pass.
-- Add `filename=` (Q7).
+- `filename=` also takes a callable (Q7).
+- A `backstamp.metadata()` function shadows the `backstamp/metadata.py` module, as
+  `backstamp.save` already shadows `backstamp/save.py` (`import backstamp.save as m` gives the
+  function). Rename the modules (e.g. `_pdf.py`, `_save.py`) and update `_SKIP_MODULES` and
+  the shims to match.
 - `Creator` becomes `backstamp <version>` when the caller's package version is unknown, in place
   of `"hypnose"`.
 - **Backward compatibility:** the reader still parses every existing Hypnose PDF (no `schema`
@@ -379,7 +386,9 @@ Build:
     exact text only.
 - `hypnose-helpers` keeps `read_figure_metadata` as a shim returning `read(path).to_dict()`,
   until Phase 5.
-- Works with no extra install; `pypdf` stays optional.
+- Read with `pypdf` only; drop the stdlib fallback parser (`_read_info_stdlib`, `_unescape`).
+- Silence pypdf's logger while reading. A junk file logs `invalid pdf header` and `EOF marker
+  not found` to stderr; it should give `unreadable`, quietly.
 - **Tests:** all four statuses, both schemas, the Phase 2 fixture PDF, and pasted paths with
   spaces, quotes and non-ASCII names.
 
@@ -440,7 +449,7 @@ redraws the figure.
 
 ### Phase 6: Public release
 
-- Write a README for an outside reader:
+- Complete the README for an outside reader:
   - a 10-line quick start
   - the forms `inputs=` takes
   - what is recorded and what is not (see Risks)
