@@ -11,8 +11,10 @@ layout, plus the figure styles, and becomes a consumer of `backstamp`. Measured 
   pytest, and a golden master only helps once a pipeline's results are trusted.
 
 **Design principle:** `backstamp` is designed to be as good as possible on its own.
-`hypnose-helpers` adapts to it, not the other way round. The one exception: the reader still
-reads figures already saved by `hypnose-helpers`, since those exist on disk.
+`hypnose-helpers` adapts to it, not the other way round.
+- backstamp's code, tests and docs never mention Hypnose or `hypnose-helpers`.
+- The reader reads records written by backstamp only. A figure saved by `hypnose-helpers`
+  before the move is read with a `hypnose-helpers` checkout from that time (`83dfc95`).
 
 **Doc style:** bullets, one fact each, no prose around the point.
 
@@ -25,7 +27,7 @@ reads figures already saved by `hypnose-helpers`, since those exist on disk.
 | 0 | Settle the open decisions; create the GitHub repo and envs | ½ h (maintainer) | done |
 | 1 | Extract unchanged, with shims in `hypnose-helpers`; publish `0.0.1` | 1 day | done |
 | 2 | Make provenance general: any inputs, every parameter, `metadata()` | 2–3 days | done |
-| 3 | Reader: `Record`, `backstamp show` with drag and drop, `backstamp ls` | 1–1½ days | — |
+| 3 | Reader: `Record`, `backstamp show` with drag and drop, `backstamp ls` | 1–1½ days | done |
 | 4 | Survival test: where the metadata survives | ½ day + ~1 h (maintainer) | — |
 | 5 | Lab rollout: move consumers to `backstamp`, remove shims | ½ day | — |
 | 6 | Public release: docs, CI, PyPI | 1–2 days | — |
@@ -372,8 +374,9 @@ Build:
     parameter, as text. Warns when the commit is `-dirty`, since the checked-out code is not what
     ran.
   - `.to_dict()`, a readable `__str__` for the terminal, and `_repr_html_` for Jupyter.
-- `Record` reads both schemas: `schema: 1` and the unversioned records in existing Hypnose PDFs
-  (`subjids`/`dates` at top level become `inputs`).
+- `Record` reads records written by backstamp (design principle). Any JSON object in
+  `Subject` is a record, `schema` or not, since `save(provenance=...)` embeds a dict as given.
+  Any other `Subject` is another program's: `unstamped`.
 - `backstamp show <files, folders or globs>`: one readable block per figure. `--json` and
   `--reproduce` flags.
 - **Drag and drop:** `backstamp show` with no path waits for one. Each figure dropped into the
@@ -385,15 +388,19 @@ Build:
   `--function NAME`, `--input KEY=VALUE`, `--subject`, `--date`, `--session`, `--commit SHA`,
   `--unstamped`.
   - `--input` matches values as text, including inside mappings.
+  - Whole numbers match by value: `--subject 40` finds `"040"`. All other text matches exactly.
   - A date inside a stored range matches only for `YYYYMMDD` and ISO dates. Other formats match
     exact text only.
-- `hypnose-helpers` keeps `read_figure_metadata` as a shim returning `read(path).to_dict()`,
-  until Phase 5.
+- `backstamp` drops `read_figure_metadata`. `hypnose-helpers`' `viz/metadata.py` becomes a
+  plain module defining it as `read(path).to_dict()`, until Phase 5.
 - Read with `pypdf` only; drop the stdlib fallback parser (`_read_info_stdlib`, `_unescape`).
 - Silence pypdf's logger while reading. A junk file logs `invalid pdf header` and `EOF marker
   not found` to stderr; it should give `unreadable`, quietly.
-- **Tests:** all four statuses, both schemas, the Phase 2 fixture PDF, and pasted paths with
-  spaces, quotes and non-ASCII names.
+- `[project.scripts]` adds the `backstamp` command once each env re-runs `pip install -e`;
+  `python -m backstamp` works without it.
+- **Tests:** all four statuses, records saved by `save` and by `save(provenance=...)`, and
+  pasted paths with spaces, quotes and non-ASCII names. The Phase 2 fixture PDF is removed
+  with the unversioned reader.
 
 ### Phase 4: Survival test
 
@@ -404,8 +411,7 @@ redraws the figure.
 - Make a test set with `backstamp.save`:
   - a small figure, a figure with a near-30,000-character record, and a figure with non-ASCII
     text in its title and inputs.
-- Check the 30,000-character record reads back in Preview, Acrobat, `pypdf` and the stdlib
-  reader (Q6).
+- Check the 30,000-character record reads back in Preview, Acrobat and `pypdf` (Q6).
 - Add `scripts/survival_check.py <original> <returned>…`. For each returned file it reports:
   - byte-identical or not
   - record intact, partly kept (which fields), or lost
@@ -445,6 +451,8 @@ redraws the figure.
 - Move the consumers listed in the Inventory to `backstamp` imports.
 - `hypnose-behavior` and `hypnose-somnotate` keep their own `io/save.py` wrappers. Only the
   import lines change.
+- backstamp has no `read_figure_metadata`. Its re-exports become `backstamp.read`, which
+  returns a `Record` (`.to_dict()` for a dict).
 - The `hypnose-somnotate` env has neither `hypnose-helpers` nor `backstamp` installed. Install
   both before its imports change.
 - Remove the shims from `hypnose-helpers`. Bump it to `0.2.0`.

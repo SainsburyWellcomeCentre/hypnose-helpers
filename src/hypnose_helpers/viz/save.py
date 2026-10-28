@@ -161,7 +161,7 @@ def save_figure(
         Extra PDF info-dictionary entries. Keys outside the PDF standard set are dropped
         (matplotlib would warn and discard them anyway).
 
-    Recover it later with `backstamp.read_figure_metadata(path)`.
+    Recover it later with `backstamp.read(path)`.
     """
     if fig is None:
         raise ValueError("fig cannot be None")

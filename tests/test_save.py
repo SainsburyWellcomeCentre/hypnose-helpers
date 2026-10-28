@@ -78,9 +78,10 @@ def test_record_names_the_plotter_and_the_file_keeps_its_tags():
         path = plot_accuracy(tmp)
         record = read_figure_metadata(path)
     assert path == Path(tmp) / "sub" / "accuracy_sub-040_066_date-20251124.pdf", path
-    assert record["function"] == "plot_accuracy", record
+    assert record["status"] == "ok", record
+    assert record["call"]["function"] == "plot_accuracy", record
     assert record["inputs"] == {"subject": [40, 66], "date": ["20251124"]}, record
-    assert record["_title"] == "accuracy sub-40,66 20251124", record
+    assert record["title"] == "accuracy sub-40,66 20251124", record
 
 
 if __name__ == "__main__":

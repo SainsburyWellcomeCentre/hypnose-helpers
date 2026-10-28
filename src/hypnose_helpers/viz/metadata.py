@@ -1,9 +1,10 @@
-"""`backstamp._pdf` under its `hypnose_helpers` import path.
+"""A saved figure's provenance record as a dict, for callers that import it from here.
 
-- The module replaces itself in `sys.modules`, so this name *is* `backstamp._pdf`,
-  private helpers and constants included.
+- `backstamp.read` returns the same record as a `backstamp.Record`.
 """
-import importlib
-import sys
+from backstamp import read
 
-sys.modules[__name__] = importlib.import_module("backstamp._pdf")
+
+def read_figure_metadata(path) -> dict:
+    """``backstamp.read(path).to_dict()``: the record with its ``status`` and ``title``."""
+    return read(path).to_dict()
