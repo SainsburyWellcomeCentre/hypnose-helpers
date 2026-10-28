@@ -1,7 +1,7 @@
 """Saving figures, and the small utilities around it.
 
 - The save itself, provenance record included, is `backstamp.save`. `save_figure` adds
-  the Hypnose filename tags, the presentation tick caps, `titles=` and `clear_legends`.
+  the Hypnose file name, the presentation tick caps, `titles=` and `clear_legends`.
 - `save_figure` takes **`fig_dir` as a required argument**: a library owned by no dataset
   must not hardcode one dataset's derivatives layout and then need a resolver hook to
   escape it. Each consumer resolves its own destination and passes it in.
@@ -11,7 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import matplotlib as mpl
-from backstamp.save import save as _save
+from backstamp import save as _save
 
 from .styles import _presentation_active, nice_x_locator, _PRESENTATION_MAX_YTICKS, \
     _PRESENTATION_MAX_XTICKS, _PRES_XTICK_BOXPLOT_LABELSIZE
@@ -71,6 +71,15 @@ def _format_span(items, prefix: str) -> str:
     return f"{prefix}-{vals[0]}-{vals[-1]}"
 
 
+def _hypnose_filename(save_name: str, inputs: dict) -> str:
+    """``{save_name}_sub-XXX_date-….pdf`` from the ``subject`` and ``date`` inputs."""
+    subj_list = _coerce_list(inputs.get("subject"))
+    date_list = _coerce_list(inputs.get("date"))
+    subj_tag = _format_span([f"{int(s):03d}" for s in subj_list], "sub") if subj_list else "sub-unknown"
+    date_tag = _format_span([int(d) if str(d).isdigit() else d for d in date_list], "date") if date_list else "date-unknown"
+    return f"{save_name}_{subj_tag}_{date_tag}.pdf"
+
+
 def strip_legends(fig_or_ax) -> int:
     """Remove every legend on the figure (or a single axes).
 
@@ -126,9 +135,9 @@ def save_figure(
     """Save a matplotlib figure as PDF into `fig_dir`, with its provenance embedded.
 
     `fig_dir` is required and is where the file lands -- this module knows nothing about
-    any dataset's derivatives layout. `subjids`/`dates` go into the record and build the
-    filename tags, so a consumer that resolves its own directory still gets the shared
-    naming convention.
+    any dataset's derivatives layout. `subjids`/`dates` go into the record as the
+    ``subject`` and ``date`` inputs and build the filename tags, so a consumer that
+    resolves its own directory still gets the shared naming convention.
 
     Parameters
     ----------
@@ -147,25 +156,20 @@ def save_figure(
         A `backstamp.provenance.provenance()` record to embed. Omitted, the calling
         frame is inspected instead. Pass it explicitly whenever a wrapper sits between
         the real plotting function and this call, or frame-walking will name the wrapper
-        -- see `capture_call`.
+        -- see `backstamp.provenance.capture_call`.
     metadata : dict | None
         Extra PDF info-dictionary entries. Keys outside the PDF standard set are dropped
         (matplotlib would warn and discard them anyway).
 
-    Recover it later with `backstamp.metadata.read_figure_metadata(path)`.
+    Recover it later with `backstamp.read_figure_metadata(path)`.
     """
     if fig is None:
         raise ValueError("fig cannot be None")
     if not save_name:
         raise ValueError("save_name must be non-empty")
 
-    subj_list = _coerce_list(subjids)
-    date_list = _coerce_list(dates)
-
-    subj_tag = _format_span([f"{int(s):03d}" for s in subj_list], "sub") if subj_list else "sub-unknown"
-    date_tag = _format_span([int(d) if str(d).isdigit() else d for d in date_list], "date") if date_list else "date-unknown"
-
-    filename = f"{save_name}_{subj_tag}_{date_tag}.pdf"
+    inputs = {key: value for key, value in (("subject", subjids), ("date", dates))
+              if value is not None}
 
     fig_dir = Path(fig_dir)
     if subdir:
@@ -213,8 +217,8 @@ def save_figure(
     # skip_modules: without it the record names this wrapper instead of the plotter.
     hidden = [] if titles else _hide_titles(fig)
     try:
-        return _save(fig, save_name, fig_dir=fig_dir, filename=filename,
-                     subjids=subjids, dates=dates, dpi=dpi, bbox_inches=bbox_inches,
+        return _save(fig, save_name, fig_dir=fig_dir, filename=_hypnose_filename,
+                     inputs=inputs, dpi=dpi, bbox_inches=bbox_inches,
                      provenance=provenance, metadata=metadata, skip_modules=(__name__,))
     finally:
         for text in hidden:

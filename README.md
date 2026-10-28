@@ -46,11 +46,11 @@ src/hypnose_helpers/
 │   ├── set_data_location.py
 │   └── selector_args.py  add_selector_args: shared -s/--sub/--subjids, -d/--date(s), --ses… flags
 └── provenance.py       backstamp.provenance under this import path (viz/metadata.py
-                        likewise for backstamp.metadata)
+                        likewise for backstamp._pdf)
 ```
 
 Figure provenance lives in [backstamp](https://github.com/Joschua21/backstamp): the commit,
-calling function and parameters recorded inside each saved PDF.
+calling function, parameters and inputs recorded inside each saved PDF.
 
 Two design rules the `viz` modules exist to enforce:
 

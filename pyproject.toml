@@ -17,7 +17,7 @@ dependencies = [
     "pandas",
     "matplotlib",
     "pyyaml",
-    "backstamp @ git+https://github.com/Joschua21/backstamp@v0.0.1",
+    "backstamp @ git+https://github.com/Joschua21/backstamp@main",
 ]
 
 [project.optional-dependencies]

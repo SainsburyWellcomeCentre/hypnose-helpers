@@ -24,7 +24,7 @@ reads figures already saved by `hypnose-helpers`, since those exist on disk.
 | --- | --- | --- | --- |
 | 0 | Settle the open decisions; create the GitHub repo and envs | ½ h (maintainer) | done |
 | 1 | Extract unchanged, with shims in `hypnose-helpers`; publish `0.0.1` | 1 day | done |
-| 2 | Make provenance general: any inputs, every parameter, `metadata()` | 2–3 days | — |
+| 2 | Make provenance general: any inputs, every parameter, `metadata()` | 2–3 days | done |
 | 3 | Reader: `Record`, `backstamp show` with drag and drop, `backstamp ls` | 1–1½ days | — |
 | 4 | Survival test: where the metadata survives | ½ day + ~1 h (maintainer) | — |
 | 5 | Lab rollout: move consumers to `backstamp`, remove shims | ½ day | — |
@@ -136,7 +136,8 @@ reads figures already saved by `hypnose-helpers`, since those exist on disk.
 - Accepted forms:
   - a dict of values or lists: `{"subject": [40, "mouseA"], "date": ["20261002", "03oct2026"]}`
   - date ranges, as a `(start, end)` pair or as text: `("20251124", "20251130")`,
-    `"20251124-20251130"`
+    `"20251124-20251130"`. A tuple of two is stored as the text `"start/end"`, since JSON
+    has no tuple; a list of two stays two values.
   - mappings, e.g. subject → date range: `{"subject": {40: ("20251124", "20251130"), 41: …}}`.
     JSON turns keys into text, so `40` is read back as `"40"`.
   - a list of parameter names: `inputs=["subjids", "dates"]` copies those parameters in full from
@@ -213,7 +214,8 @@ reads figures already saved by `hypnose-helpers`, since those exist on disk.
 - **`redact=["token", …]`** drops the named parameters from the record. Each is listed as
   `<redacted>`, so the reader can see that it existed.
 - **`backstamp.configure(paths=…, redact=…)`** sets both once per process, so a project doesn't
-  repeat them in every call. Arguments to `save` and `metadata` override it.
+  repeat them in every call. `paths=` on a call overrides it; `redact=` on a call adds to it,
+  so a configured name is always redacted.
 
 ---
 
