@@ -28,13 +28,15 @@ layout, plus the figure styles, and becomes a consumer of `backstamp`. Measured 
 | 1 | Extract unchanged, with shims in `hypnose-helpers`; publish `0.0.1` | 1 day | done |
 | 2 | Make provenance general: any inputs, every parameter, `metadata()` | 2–3 days | done |
 | 3 | Reader: `Record`, `backstamp show` with drag and drop, `backstamp ls` | 1–1½ days | done |
-| 4 | Survival test: where the metadata survives | ½ day + ~1 h (maintainer) | — |
+| 4 | Survival test: where the metadata survives | ½ day + ~1 h (maintainer) | done |
+| 4b | Reader: figures inside decks and LaTeX PDFs, `--slide`, `--page` | ½–1 day | — |
+| 4c | `backstamp strip`: a copy without the record, for publishing | ½ day | — |
 | 5 | Lab rollout: move consumers to `backstamp`, remove shims | ½ day | — |
 | 6 | Public release: docs, CI, PyPI | 1–2 days | — |
 
 - After Phase 5, the package is usable inside the lab via `pip install backstamp` or
   `pip install git+https://…`.
-- Phases 1–5 take about 5–6½ days. Phase 6 brings the total to about 1½ weeks.
+- Phases 1–5 take about 6–8 days. Phase 6 brings the total to about 2 weeks.
 - Use the package across the Hypnose repos for a few weeks between Phase 5 and Phase 6. The API
   is cheap to change until outside users depend on it.
 - Items under "Optional, after the first release" are not part of any phase.
@@ -168,7 +170,9 @@ layout, plus the figure styles, and becomes a consumer of `backstamp`. Measured 
 
 - Cap (`MAX_BLOB`): **30,000 characters.**
 - This keeps a margin below 32,767 bytes, the string length in the PDF specification's
-  implementation limits. Unverified: Phase 4 reads back a 30,000-character record.
+  implementation limits. Phase 4: `pypdf` and Preview show a 29,996-character record in
+  full. Acrobat's Document Properties shows only its first ~2,000 characters, but saving in
+  Acrobat keeps all of it.
 - Over the cap: the save still succeeds. A `UserWarning` names the figure and the record size, and
   says the data summaries were dropped, so the caller can trim inputs or parameters.
 - Still over after that: parameters are cut, largest first, and the warning lists which.
@@ -417,34 +421,109 @@ redraws the figure.
   - record intact, partly kept (which fields), or lost
   - for `.pptx` and `.key` files (zip containers): whether the original PDF is stored inside,
     and whether its record is intact.
-- The maintainer runs the GUI rows and drops the returned files into one folder. The script
-  fills the table.
+- The maintainer runs the GUI rows and drops the returned files into one folder per route,
+  `~/backstamp-survival/returned/<route>/`, next to the test set in `originals/`. The script
+  reads the route from the folder and fills the table.
+- Q6: `pypdf` and Preview show the 29,996-character record of `large.pdf` in full. Acrobat's
+  Document Properties shows the first 1,999 characters only; Acrobat's save keeps it whole.
+- Found on the way: a tree dirty from untracked files alone stored `diff_sha` of an empty
+  diff, the same for every such figure. `diff_sha` is now left out then. Gate GREEN.
+- Results, measured 2026-10-28 on macOS 27.0.1:
+  - Each row held for all three figures: record size and non-ASCII text made no difference.
+  - "Intact" means `backstamp show` reads the full record, `Title` and `Creator` included.
+  - In a deck, the record is intact inside the stored PDF, but `backstamp show` does not
+    look inside `.key` or `.pptx` files until Phase 4b.
+  - Acrobat and Illustrator also copy `Subject` into XMP `dc:description`, which backstamp
+    does not read.
 
 | Route | Result |
 | --- | --- |
-| Finder copy / move | |
-| Dropbox / OneDrive / Google Drive, upload then download | |
-| git commit then clone | |
-| Slack upload, recipient downloads | |
-| Email attachment (UCL Outlook), recipient saves | |
-| Open in Preview, close without saving | |
-| Annotate in Preview, save | |
-| Open in Acrobat, save | |
-| Open in Illustrator / Inkscape, save as PDF | |
-| Drag into Keynote, save; record of the PDF stored inside the `.key` | |
-| Drag into Mac PowerPoint, save; record of the PDF stored inside the `.pptx` | |
-| Insert into Windows PowerPoint, save | |
-| Insert into Google Slides (via PNG), download as `.pptx` | |
-| Copy-paste out of Keynote / PowerPoint into another deck | |
-| Copy-paste out of Keynote / PowerPoint into Preview ("New from Clipboard") | |
-| Export the deck to PDF | |
-| Print to PDF | |
-| Overleaf: `\includegraphics`, compile, download | |
+| Finder copy / move | byte-identical, record intact (also `cp`, `mv`) |
+| Dropbox / OneDrive / Google Drive, upload then download | byte-identical, record intact. Dropbox and OneDrive download several files as a zip |
+| git commit then clone | byte-identical, record intact |
+| Slack upload, recipient downloads | byte-identical, record intact |
+| Email attachment (Outlook), recipient saves | byte-identical, record intact |
+| Open in Preview, close without saving | byte-identical, record intact |
+| Annotate in Preview, save | rewritten, record intact |
+| Open in Acrobat, save | rewritten, record intact |
+| Open in Illustrator / Inkscape, save as PDF | Illustrator 30.8: `Subject` kept, so the record reads in full; `Title` becomes the file name, `Creator` Illustrator. Inkscape 1.4.3 (internal import): lost |
+| Drag into Keynote, save; record of the PDF stored inside the `.key` | stored byte-identical under `Data/`, record intact |
+| Drag into Mac PowerPoint, save; record of the PDF stored inside the `.pptx` | stored byte-identical, wrapped in an EMF under `ppt/media/`, record intact |
+| Copy-paste out of Keynote / PowerPoint into another deck | stored byte-identical in the new deck, record intact (both) |
+| Copy-paste out of Keynote / PowerPoint into Preview ("New from Clipboard") | PowerPoint: rewritten, record intact. Keynote: lost |
+| Export the deck to PDF | lost (Keynote and PowerPoint) |
+| Print to PDF | lost (from Preview) |
+| Overleaf: `\includegraphics`, compile, download | lost from the info dictionary; pdfTeX keeps each figure's, record included, as `/PTEX.InfoDict` on the included page |
 
 - The filled table goes into the README in Phase 6 as "What the metadata survives".
 - **Fixes are out of scope for this phase.** They are discussed after the test, with the
   results in hand. Options raised on 2026-10-05 (a visible ID, a save log, image matching,
   invisible text in the PDF) were not taken up.
+
+### Phase 4b: Figures inside decks and LaTeX PDFs
+
+Phase 4 found the record intact inside Keynote and PowerPoint decks, and inside PDFs
+compiled with pdfLaTeX, where `read` does not look. Read it there.
+
+- `backstamp show deck.key` lists every figure's record, by slide; `backstamp show paper.pdf`
+  by page. `--slide 5` and `--page 3` keep the figures on that slide or page; both repeat.
+- `backstamp.read_all(path) -> list[Record]`: one `Record` per figure; a plain PDF gives one.
+  - `Record` gains `where`: the slide or page, and the file the figure was stored or
+    included as, e.g. `{"slide": 5, "file": "small-9092.pdf"}`.
+  - `read` keeps one `Record` per file: `unreadable` for a deck, `unstamped` for a LaTeX
+    PDF whose own info dictionary holds no record.
+  - `ls` lists the figures inside decks and LaTeX PDFs as rows of their own
+    (`deck.key slide 5`); its filters apply to them.
+  - A figure on several slides is one stored file: listed on each.
+- Where the records are, checked 2026-10-28 on the Phase 4 files:
+  - `.key` (zip or package folder): the PDFs under `Data/`, named `<name>-<data ID>.pdf`.
+    `Index/*.iwa` is snappy-compressed protobuf, readable without Apple's schema. The show
+    (message type 2) lists the slide nodes (type 4) in slide order; each node points to its
+    slide; the `.iwa` file holding the slide object lists the data IDs of its images. The
+    `.iwa` file names do not follow the slide IDs. Snappy needs a small pure-Python decoder,
+    not a dependency.
+  - `.pptx`: the PDFs under `ppt/media/`, bare or wrapped in an EMF, cut out from `%PDF-` to
+    the last `%%EOF`. The slide is the `ppt/slides/slideN.xml` whose `.rels` names the media
+    file; the slide order is `ppt/presentation.xml`'s slide list, not `N`.
+  - pdfLaTeX: `/PTEX.InfoDict` on each page's form XObjects, with `/PTEX.FileName`.
+- Checked on 5-slide Keynote and Mac PowerPoint decks (one figure each on slides 1–3, all
+  three on 4 and 5), and on copies with slide 3 moved to first: every figure on its slide.
+- Unchecked: skipped and nested Keynote slides, Windows PowerPoint, LuaLaTeX and XeLaTeX.
+- A deck whose slide order cannot be read lists its figures without slide numbers, and
+  `show` says so.
+- Fixtures: those four decks, in `~/backstamp-survival/returned/` as `keynote-slides`,
+  `keynote-reordered`, `powerpoint-slides` and `powerpoint-reordered`. Build the LaTeX case
+  with pypdf.
+- **Tests:** each source, `--slide` and `--page`, a figure on two slides, a deck whose index
+  cannot be read, the `ls` rows. On Python 3.9 too (Q8).
+
+### Phase 4c: Strip the record before publishing
+
+The record is for the people who made the figure. A figure sent to a journal, or a paper
+posted as a preprint, need not carry it (see Risks).
+
+- `backstamp strip <files, folders or globs>` writes a copy without the record: `fig.pdf` →
+  `fig_stripped.pdf`, next to it. The original is never changed. With no path it waits for
+  one, as `show` does, so a figure can be dropped into the terminal.
+- `backstamp.strip(path, out=None) -> Path`: the same in Python.
+- It removes what `read_all` (Phase 4b) finds, and nothing else:
+  - the record in `Subject`, with backstamp's `Title` and `Creator`
+  - each `/PTEX.InfoDict` holding a record, in a PDF compiled with pdfLaTeX
+  - XMP `dc:description` holding a record, where Acrobat and Illustrator copy it (Phase 4)
+- The rest of the PDF stays: a paper's own `Title`, its pages, links and outline. pypdf
+  writes the copy, cloning the document.
+- It then checks the copy: `read_all` finds nothing, and no record text is left anywhere in
+  the file, compressed streams included (the search in `scripts/survival_check.py`). Text
+  left over fails the command, naming where it is.
+- A PDF without a record gets no copy; `strip` says so.
+- Decks are not stripped: PowerPoint's EMF wrapper would need rewriting, and Keynote's index
+  may hold checksums of its files. `strip` names the figures in a deck that hold records, and
+  says to strip them before adding them, or to share the deck as an exported PDF, which
+  holds none (Phase 4).
+- Name: `strip`, as in ImageMagick's `-strip`. `unstamp`, matching the `unstamped` status,
+  is the alternative.
+- **Tests:** a saved figure, a pdfLaTeX-style PDF built with pypdf, a record in XMP, a PDF
+  without a record, a deck, the check finding leftover text, the original unchanged.
 
 ### Phase 5: Lab rollout
 
@@ -467,6 +546,7 @@ redraws the figure.
   - the forms `inputs=` takes
   - what is recorded and what is not (see Risks)
   - what the metadata survives (the Phase 4 table)
+  - that a paper compiled with pdfLaTeX carries every figure's record (see Risks)
   - a screenshot of `backstamp show`
 - Set up GitHub Actions: tests on Python 3.9–3.13 on Linux, macOS and Windows. Git-dependent
   tests run against a temporary repo created in the test.
@@ -514,3 +594,8 @@ redraws the figure.
   plotting function ends up in the PDF. Paths are reduced to their file name by default and
   named parameters can be redacted (Q10). Names and other text in ordinary strings are still
   stored; the README says so.
+- **The record travels into papers.** pdfLaTeX copies each included figure's info dictionary
+  into the compiled PDF as `/PTEX.InfoDict` (Phase 4), so a paper or preprint compiled that
+  way carries every figure's record: repo, parameters, inputs. The README says so, with two
+  ways out: `\pdfsuppressptexinfo=-1` in the preamble (unverified), or `backstamp strip` on
+  the compiled PDF (Phase 4c).
