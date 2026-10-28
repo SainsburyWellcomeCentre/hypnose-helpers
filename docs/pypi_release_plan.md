@@ -455,7 +455,7 @@ redraws the figure.
 | Print to PDF | lost (from Preview) |
 | Overleaf: `\includegraphics`, compile, download | lost from the info dictionary; pdfTeX keeps each figure's, record included, as `/PTEX.InfoDict` on the included page |
 
-- The filled table goes into the README in Phase 6 as "What the metadata survives".
+- The filled table goes into the README in Phase 4b as "What the record survives".
 - **Fixes are out of scope for this phase.** They are discussed after the test, with the
   results in hand. Options raised on 2026-10-05 (a visible ID, a save log, image matching,
   invisible text in the PDF) were not taken up.
@@ -494,6 +494,9 @@ compiled with pdfLaTeX, where `read` does not look. Read it there.
 - Fixtures: those four decks, in `~/backstamp-survival/returned/` as `keynote-slides`,
   `keynote-reordered`, `powerpoint-slides` and `powerpoint-reordered`. Build the LaTeX case
   with pypdf.
+- README: a "What the record survives" section with the Phase 4 table, written for a user:
+  which routes keep the record, which lose it, and that `backstamp show` reads it inside
+  decks and pdfLaTeX PDFs.
 - **Tests:** each source, `--slide` and `--page`, a figure on two slides, a deck whose index
   cannot be read, the `ls` rows. On Python 3.9 too (Q8).
 
@@ -545,7 +548,6 @@ posted as a preprint, need not carry it (see Risks).
   - a 10-line quick start
   - the forms `inputs=` takes
   - what is recorded and what is not (see Risks)
-  - what the metadata survives (the Phase 4 table)
   - that a paper compiled with pdfLaTeX carries every figure's record (see Risks)
   - a screenshot of `backstamp show`
 - Set up GitHub Actions: tests on Python 3.9–3.13 on Linux, macOS and Windows. Git-dependent
