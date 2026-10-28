@@ -90,9 +90,8 @@ sets apart with its legend (a score table, say) is drawn in its own figure and p
 pip install -e /path/to/hypnose-helpers
 ```
 
-Dependencies are deliberately minimal (`numpy`, `pandas`, `matplotlib`, `pyyaml`) and
-support Python ≥3.9, so every repo in the family can install it — including those pinned
-to 3.9 by pomegranate/somnotate. 
+Dependencies are deliberately minimal (`numpy`, `pandas`, `matplotlib`, `pyyaml`,
+`backstamp`) and support Python ≥3.9. 
 
 Optional extras: `test`.
 

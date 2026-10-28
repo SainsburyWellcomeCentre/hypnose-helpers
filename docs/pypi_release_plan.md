@@ -184,10 +184,11 @@ reads figures already saved by `hypnose-helpers`, since those exist on disk.
 
 ### Q8: Python floor — decided
 
-- `hypnose-helpers` is `>=3.9`, because `hypnose-eeg-preprocessing` is pinned to 3.9.
-- Python 3.9 has been end-of-life since 2025-10. Outside users won't need it.
-- **Decided: `>=3.9`** while that pin exists, since it costs only the
-  `packages_distributions` fallback, which already exists. Raise it to `>=3.10` once the pin goes.
+- **Decided: `backstamp` supports `>=3.9`**, for users still on 3.9. It costs only the
+  `packages_distributions` fallback in `package_version`, which already exists.
+- No Hypnose repo needs 3.9 (2026-10-28): `hypnose-somnotate` runs on 3.12.
+- Python 3.9 has been end-of-life since 2025-10. Raise the floor once keeping it costs real
+  work, e.g. a dependency drops 3.9 or the code needs 3.10 syntax.
 
 ### Q9: Public names — decided
 
@@ -283,8 +284,8 @@ first, current behaviour only.
   - `backstamp` (Python 3.12): development, plus `matplotlib`, `pytest`, `build`, `twine`.
     3.12 matches `hypnose-behavior` and `hypnose-somnotate`, and gets the matplotlib users have:
     matplotlib 3.10+ needs Python 3.10+.
-  - `backstamp-py39` (Python 3.9): `matplotlib` and `pytest` only, to run the tests on the
-    floor version (Q8) until Phase 6's CI does it.
+  - `backstamp-py39` (Python 3.9): runs the tests on the floor version (Q8) until Phase 6's
+    CI does it.
   - `pypdf` is a dependency (Phase 1), so the editable install brings it into each env.
 
 ### Phase 1: Extract unchanged
@@ -442,6 +443,8 @@ redraws the figure.
 - Move the consumers listed in the Inventory to `backstamp` imports.
 - `hypnose-behavior` and `hypnose-somnotate` keep their own `io/save.py` wrappers. Only the
   import lines change.
+- The `hypnose-somnotate` env has neither `hypnose-helpers` nor `backstamp` installed. Install
+  both before its imports change.
 - Remove the shims from `hypnose-helpers`. Bump it to `0.2.0`.
 - Tag and publish `backstamp 0.1.0`. Consumers pin to it.
 - Add a "Figure provenance" section to the lab README or wiki: install, `backstamp.save`,
