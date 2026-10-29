@@ -29,7 +29,7 @@ layout, plus the figure styles, and becomes a consumer of `backstamp`. Measured 
 | 2 | Make provenance general: any inputs, every parameter, `metadata()` | 2–3 days | done |
 | 3 | Reader: `Record`, `backstamp show` with drag and drop, `backstamp ls` | 1–1½ days | done |
 | 4 | Survival test: where the metadata survives | ½ day + ~1 h (maintainer) | done |
-| 4b | Reader: figures inside decks and LaTeX PDFs, `--slide`, `--page` | ½–1 day | — |
+| 4b | Reader: figures inside decks and LaTeX PDFs, `--slide`, `--page` | ½–1 day | done |
 | 4c | `backstamp strip`: a copy without the record, for publishing | ½ day | — |
 | 5 | Lab rollout: move consumers to `backstamp`, remove shims | ½ day | — |
 | 6 | Public release: docs, CI, PyPI | 1–2 days | — |
@@ -202,6 +202,10 @@ layout, plus the figure styles, and becomes a consumer of `backstamp`. Measured 
 - **Decided:** `backstamp.save`, `backstamp.metadata`, `backstamp.read`; command line
   `backstamp show`, `backstamp ls`.
 - `save` is the name the talk used; `read` and `show` are the usual Python and CLI names.
+- **Decided (Phase 4b):** `backstamp.read_all` and `Record.where` for the figures inside a
+  file. `read` stays one `Record` per file: folding `read_all` into it would make its
+  return type depend on the file, and a PDF's page count does not say how many figures it
+  holds.
 
 ### Q10: Paths and private data — decided
 
@@ -491,14 +495,39 @@ compiled with pdfLaTeX, where `read` does not look. Read it there.
 - Unchecked: skipped and nested Keynote slides, Windows PowerPoint, LuaLaTeX and XeLaTeX.
 - A deck whose slide order cannot be read lists its figures without slide numbers, and
   `show` says so.
-- Fixtures: those four decks, in `~/backstamp-survival/returned/` as `keynote-slides`,
-  `keynote-reordered`, `powerpoint-slides` and `powerpoint-reordered`. Build the LaTeX case
-  with pypdf.
+- Fixtures: those four decks, from `~/backstamp-survival/returned/` (`keynote-slides`,
+  `keynote-reordered`, `powerpoint-slides`, `powerpoint-reordered`), trimmed to what the
+  reader needs. Build the LaTeX case with pypdf.
 - README: a "What the record survives" section with the Phase 4 table, written for a user:
   which routes keep the record, which lose it, and that `backstamp show` reads it inside
   decks and pdfLaTeX PDFs.
 - **Tests:** each source, `--slide` and `--page`, a figure on two slides, a deck whose index
   cannot be read, the `ls` rows. On Python 3.9 too (Q8).
+- Results, 2026-10-29:
+  - Built: `read_all`, `Record.where`, `show --slide/--page`, `ls` rows
+    (`talk.key slide 3 small-9092`), the README section. The readers are in
+    `backstamp/_inside.py`; `read` on a deck says to use `read_all`.
+  - Keynote's slide order is read from the show's slide tree (payload field 3, repeated
+    field 2). Each node holds its slide in field 2, and nodes nested under it in field 1
+    (Apple's schema; unchecked). The show's reference list gave the same order on all four
+    decks, but it is not in field order: the theme comes after the nodes.
+  - A Keynote slide's figures are the data reached by references from the slide, among
+    the objects in its own `.iwa` file. References leaving the file reach the template
+    slide and its images.
+  - The EMF holds the PDF whole, in a `GDIC` multi-format comment. Cutting from `%PDF-` to
+    `%%EOF` drops only the final newline, which pypdf does not need.
+  - A figure stored in a deck but on no slide comes after the slides, with `slide` `None`.
+  - Fixtures: `backstamp/tests/fixtures/`, 252 KB: `Index/Document.iwa`,
+    `Index/Slide*.iwa` and `Data/*.pdf`; `ppt/presentation.xml`, slides and media.
+  - Tests: `tests/test_inside.py` (11). All 90 pass in `backstamp` and `backstamp-py39`,
+    run directly and with pytest. The gate was not run: `to_dict()` only gains `where`,
+    and nothing downstream compares its keys.
+  - The README's pdfLaTeX privacy note stays in Phase 6 (decided at the start of 4b);
+    `\pdfsuppressptexinfo=-1` is still unverified.
+  - Still unchecked: skipped and nested Keynote slides; whether Keynote's package format
+    keeps the index as `Index/` or `Index.zip` (both are read); a PDF on a Keynote master
+    or PowerPoint layout (it would list on no slide); Windows PowerPoint; LuaLaTeX and
+    XeLaTeX.
 
 ### Phase 4c: Strip the record before publishing
 
