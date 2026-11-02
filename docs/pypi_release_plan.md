@@ -30,7 +30,7 @@ layout, plus the figure styles, and becomes a consumer of `backstamp`. Measured 
 | 3 | Reader: `Record`, `backstamp show` with drag and drop, `backstamp ls` | 1–1½ days | done |
 | 4 | Survival test: where the metadata survives | ½ day + ~1 h (maintainer) | done |
 | 4b | Reader: figures inside decks and LaTeX PDFs, `--slide`, `--page` | ½–1 day | done |
-| 4c | `backstamp strip`: a copy without the record, for publishing | ½ day | — |
+| 4c | `backstamp strip`: a copy without the record, for publishing | ½ day | done |
 | 5 | Lab rollout: move consumers to `backstamp`, remove shims | ½ day | — |
 | 6 | Public release: docs, CI, PyPI | 1–2 days | — |
 
@@ -206,6 +206,8 @@ layout, plus the figure styles, and becomes a consumer of `backstamp`. Measured 
   file. `read` stays one `Record` per file: folding `read_all` into it would make its
   return type depend on the file, and a PDF's page count does not say how many figures it
   holds.
+- **Decided (Phase 4c):** `backstamp.strip` and the command `backstamp strip`, as in
+  ImageMagick's `-strip`.
 
 ### Q10: Paths and private data — decided
 
@@ -538,24 +540,68 @@ posted as a preprint, need not carry it (see Risks).
   `fig_stripped.pdf`, next to it. The original is never changed. With no path it waits for
   one, as `show` does, so a figure can be dropped into the terminal.
 - `backstamp.strip(path, out=None) -> Path`: the same in Python.
-- It removes what `read_all` (Phase 4b) finds, and nothing else:
+- It removes the records and what backstamp wrote beside them, and nothing else:
   - the record in `Subject`, with backstamp's `Title` and `Creator`
   - each `/PTEX.InfoDict` holding a record, in a PDF compiled with pdfLaTeX
-  - XMP `dc:description` holding a record, where Acrobat and Illustrator copy it (Phase 4)
+  - XMP `dc:description` holding a record, where Acrobat and Illustrator copy it (Phase 4),
+    with backstamp's `dc:title` and `xmp:CreatorTool`
+- `Title` and `Creator` are backstamp's when they are what it writes for that record:
+  - `Creator`: `<module> <version>` from the record, or `backstamp <version>`.
+  - `Title`: beside backstamp's `Creator`, or backstamp's summary of the record's inputs
+    under any name, cut or not. Illustrator's file-name `Title` and its `Creator` stay.
+  - The same rule holds for `dc:title` and `xmp:CreatorTool`.
+- `strip` reads XMP itself; `read_all` and `show` do not (no Phase 4 route kept XMP and
+  lost `Subject`).
 - The rest of the PDF stays: a paper's own `Title`, its pages, links and outline. pypdf
   writes the copy, cloning the document.
-- It then checks the copy: `read_all` finds nothing, and no record text is left anywhere in
-  the file, compressed streams included (the search in `scripts/survival_check.py`). Text
-  left over fails the command, naming where it is.
+- It then checks the copy: `read_all` and strip's own search find no record, and no record
+  text is left anywhere in the file, compressed streams included (`contains`, moved from
+  `scripts/survival_check.py`). Text left over fails the command, naming where it is.
 - A PDF without a record gets no copy; `strip` says so.
 - Decks are not stripped: PowerPoint's EMF wrapper would need rewriting, and Keynote's index
   may hold checksums of its files. `strip` names the figures in a deck that hold records, and
   says to strip them before adding them, or to share the deck as an exported PDF, which
   holds none (Phase 4).
-- Name: `strip`, as in ImageMagick's `-strip`. `unstamp`, matching the `unstamped` status,
-  is the alternative.
+- Name: `strip` (Q9).
 - **Tests:** a saved figure, a pdfLaTeX-style PDF built with pypdf, a record in XMP, a PDF
   without a record, a deck, the check finding leftover text, the original unchanged.
+- Results, 2026-11-02:
+  - Built: `backstamp.strip`, `backstamp strip` with drag and drop, the README section
+    "Strip the record before publishing". The code is `backstamp/_strip.py`; `contains`
+    is there, and `scripts/survival_check.py` imports it.
+  - The copy is written to a temporary file next to the target and renamed only once it
+    passes the check. A copy already there is replaced. An `out=` naming the original is
+    refused.
+  - The records are removed from the reader's objects, which the clone then copies. No
+    private pypdf API.
+  - Acrobat also copies backstamp's `Title` into XMP `dc:title` and its `Creator` into
+    `xmp:CreatorTool`; the plan had listed only `dc:description`.
+  - Illustrator's own editing data (`/PieceInfo`, Zstandard-compressed) does not hold the
+    record: decompressed with the `zstd` tool. The check cannot search Zstandard data;
+    Python's standard library reads it from 3.14 only.
+  - The leftover search decodes PDF string escapes and hex strings first. pypdf 6 writes
+    a copied record with octal escapes (`\042` for `"`), which the Phase 4 search missed.
+    It also matches XML-escaped text, and searches for a record's first 100 characters,
+    so a copy cut short is found too.
+  - A failed check names the object, e.g. `the info dictionary (object 7)` for a record
+    copied into `Keywords`.
+  - pypdf floor raised to 3.15: `PdfWriter(clone_from=)` arrived in 3.7.0 and fails on a
+    PDF without `/Info` until 3.15.0; `set_data` on a Flate stream arrived in 3.10.0.
+    Checked in pypdf's source and changelog at those tags; the tests run on 6.21.3 only.
+  - Real files (`~/backstamp-survival/returned/`, copies written elsewhere):
+    - Acrobat: `Subject`, `Title`, `Creator` and the three XMP fields removed.
+    - Illustrator: `Subject` and `dc:description` removed; its `Title`, `Creator`,
+      `dc:title` and `xmp:CreatorTool` stay.
+    - Preview (annotated): `Subject`, `Title`, `Creator` removed.
+    - Overleaf: the three figures' `/PTEX.InfoDict` removed; TeX's info dictionary stays.
+    - Pages and content streams byte-identical; the Overleaf and Acrobat files render
+      pixel-identical (`sips`). Decks: their figures named, by slide. Inkscape's copy
+      gets none. Originals unchanged.
+  - Tests: `tests/test_strip.py` (11). All 101 pass in `backstamp` and `backstamp-py39`,
+    run directly and with pytest. The gate was not run: 4c leaves `provenance.py`,
+    `_save.py`, `metadata()`, `build_pdf_metadata` and `_SKIP_MODULES` alone.
+  - Unchecked: XMP in UTF-16; XMP compressed other than with Flate (strip then fails,
+    naming pypdf's error); encrypted PDFs.
 
 ### Phase 5: Lab rollout
 
