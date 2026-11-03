@@ -38,15 +38,13 @@ src/hypnose_helpers/
 │   └── tables.py       parquet-vs-CSV dispatch
 ├── viz/
 │   ├── styles.py       nature / poster / presentation styles, use_style, ensure_style
-│   ├── save.py         save_figure(…, fig_dir=…), strip_legends, set_size
+│   ├── save.py         save_figure(…, fig_dir=…), strip_legends, set_size; saves through backstamp
 │   ├── plotter.py      the plotter convention: finish_figure, legend_figure, show_suffix, tie
 │   ├── legends.py      legends set apart from their figures, for slides
 │   └── series.py       a figure's series shown a few at a time, for build-up slides
-├── cli/
-│   ├── set_data_location.py
-│   └── selector_args.py  add_selector_args: shared -s/--sub/--subjids, -d/--date(s), --ses… flags
-└── provenance.py       git commit (+dirty) and package version, for figure metadata
-                        and run manifests alike
+└── cli/
+    ├── set_data_location.py
+    └── selector_args.py  add_selector_args: shared -s/--sub/--subjids, -d/--date(s), --ses… flags
 ```
 
 Two design rules the `viz` modules exist to enforce:
@@ -81,17 +79,64 @@ artist that belongs to a series without its label (a band, error bars) is tied t
 sets apart with its legend (a score table, say) is drawn in its own figure and passed to
 `show_apart(fig)`, which shows it like the legend figure and closes it, never saved.
 
+## Figure provenance
+
+Every figure saved through `save_figure` carries a record of how it was made, inside the
+PDF: the commit, the plotting function, every parameter, and the subjects and dates.
+[backstamp](https://github.com/Joschua21/backstamp) writes and reads it.
+
+- **Install:** it comes with this package. Outside the Hypnose repos: `pip install backstamp`.
+- **Save:** `save_figure` here and in each repo's `io/save.py` already writes the record.
+  For a figure saved any other way, call `backstamp.save` inside the plotting function:
+
+  ```python
+  import backstamp
+
+  def plot_latency(subjids, dates, window=50):
+      fig, ax = plt.subplots()
+      ...
+      backstamp.save(fig, "latency", fig_dir=fig_dir, inputs={"subject": subjids, "date": dates})
+  ```
+
+  To keep your own `savefig`, pass `metadata=backstamp.metadata(inputs=...)`, also from
+  inside the plotting function.
+- **`inputs=`** records the data that went in, in any format:
+  - values or lists: `{"subject": [66, "sub-067"], "date": ["20261002", "03oct2026"]}`
+  - a date range as a pair: `{"date": ("20251124", "20251130")}`
+  - each subject's own dates: `{"subject": {66: ("20251124", "20251130"), 67: "20260101"}}`
+  - parameter names, copied from the call: `inputs=["subjids", "dates"]`
+
+  Use the keys `subject`, `date` and `session`: `backstamp ls` filters on them.
+- **Read:** `backstamp show figure.pdf` prints the record; `backstamp show` alone waits for
+  figures dragged into the terminal. It also reads the figures inside Keynote and
+  PowerPoint decks, by slide, and pdfLaTeX papers, by page.
+  - `backstamp ls figures/ --subject 66` lists a folder's figures.
+  - `backstamp show --reproduce figure.pdf` prints the commands that make it again.
+  - In Python: `backstamp.read(path)`.
+- **Strip before publishing:** `backstamp strip paper.pdf` writes `paper_stripped.pdf`
+  without the records, for a journal or a preprint; the original is unchanged. A paper
+  compiled with pdfLaTeX carries every included figure's record: repo, parameters, inputs.
+
+Two rules:
+
+- A function that wraps `save_figure` passes
+  `provenance=backstamp.provenance.provenance(skip_modules=(__name__,))`, as each repo's
+  `io/save.py` does, or every record names the wrapper instead of the plotter.
+- Don't reassign a parameter before saving: values are recorded when the figure is saved.
+
+What the record holds, and which routes it survives: [backstamp's
+README](https://github.com/Joschua21/backstamp#readme).
+
 ## Install
 
 ```
 pip install -e /path/to/hypnose-helpers
 ```
 
-Dependencies are deliberately minimal (`numpy`, `pandas`, `matplotlib`, `pyyaml`) and
-support Python ≥3.9, so every repo in the family can install it — including those pinned
-to 3.9 by pomegranate/somnotate. 
+Dependencies are deliberately minimal (`numpy`, `pandas`, `matplotlib`, `pyyaml`,
+`backstamp` from PyPI) and support Python ≥3.9. 
 
-Optional extras: `pdf` (read figure provenance back out of a saved PDF), `test`.
+Optional extras: `test`.
 
 ## Status
 

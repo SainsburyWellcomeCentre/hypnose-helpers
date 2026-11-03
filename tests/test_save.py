@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-"""Unit tests for `hypnose_helpers.viz.save`'s presentation tick caps.
+"""Unit tests for `hypnose_helpers.viz.save`: the presentation tick caps and the wrapper
+around `backstamp.save`.
 
 Run directly (no pytest needed)::
 
@@ -18,6 +19,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.ticker import LogLocator, MaxNLocator  # noqa: E402
 
+from backstamp import read  # noqa: E402
 from hypnose_helpers.viz.save import save_figure  # noqa: E402
 from hypnose_helpers.viz.styles import use_style  # noqa: E402
 
@@ -62,6 +64,24 @@ def test_titles_false_saves_untitled_and_restores():
         save_figure(fig, "untitled", fig_dir=tmp, titles=False)
     assert at_save == [[True, True, True], [False, False, False]], at_save
     assert all(t.get_visible() for t in texts)
+
+
+def test_record_names_the_plotter_and_the_file_keeps_its_tags():
+    use_style("nature")
+
+    def plot_accuracy(fig_dir):
+        fig, ax = plt.subplots()
+        return save_figure(fig, "accuracy", fig_dir=fig_dir, subdir="sub",
+                           subjids=[40, 66], dates=["20251124"])
+
+    with tempfile.TemporaryDirectory() as tmp:
+        path = plot_accuracy(tmp)
+        record = read(path)
+    assert path == Path(tmp) / "sub" / "accuracy_sub-040_066_date-20251124.pdf", path
+    assert record.status == "ok", record
+    assert record.call["function"] == "plot_accuracy", record
+    assert record.inputs == {"subject": [40, 66], "date": ["20251124"]}, record
+    assert record.title == "accuracy sub-40,66 20251124", record
 
 
 if __name__ == "__main__":

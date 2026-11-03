@@ -13,4 +13,4 @@ The first time that is violated you get an import cycle, and the second consumer
 one that discovers it.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

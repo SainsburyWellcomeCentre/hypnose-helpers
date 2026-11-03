@@ -4,11 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hypnose-helpers"
-version = "0.1.0"
+version = "0.2.0"
 description = "Modality-agnostic helpers shared across the Hypnose repos: data-location resolution, sub-XXX/ses-YY layout walking, selector parsing, figure styles and saving."
 readme = "README.md"
-# 3.9 because hypnose-eeg-preprocessing is pinned there via pomegranate/somnotate.
-# Every dependency below supports it, so any repo in the family can install this.
+# Matches backstamp's floor.
 requires-python = ">=3.9"
 
 # Deliberately minimal. A helper that needs a heavy dependency almost certainly
@@ -18,14 +17,10 @@ dependencies = [
     "pandas",
     "matplotlib",
     "pyyaml",
+    "backstamp~=0.1.0",
 ]
 
 [project.optional-dependencies]
-# read_figure_metadata() uses pypdf when it is present, but falls back to a small
-# stdlib parser: matplotlib writes the PDF info dictionary uncompressed, so the
-# provenance is recoverable without it. Install this only to read PDFs written by
-# other tools -- provenance that needs an extra install is provenance nobody reads.
-pdf = ["pypdf"]
 test = ["pytest"]
 
 [project.scripts]
