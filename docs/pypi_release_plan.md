@@ -31,7 +31,7 @@ layout, plus the figure styles, and becomes a consumer of `backstamp`. Measured 
 | 4 | Survival test: where the metadata survives | ½ day + ~1 h (maintainer) | done |
 | 4b | Reader: figures inside decks and LaTeX PDFs, `--slide`, `--page` | ½–1 day | done |
 | 4c | `backstamp strip`: a copy without the record, for publishing | ½ day | done |
-| 5 | Lab rollout: move consumers to `backstamp`, remove shims | ½ day | — |
+| 5 | Lab rollout: move consumers to `backstamp`, remove shims | ½ day | done |
 | 6 | Public release: docs, CI, PyPI | 1–2 days | — |
 
 - After Phase 5, the package is usable inside the lab via `pip install backstamp` or
@@ -616,6 +616,44 @@ posted as a preprint, need not carry it (see Risks).
 - Tag and publish `backstamp 0.1.0`. Consumers pin to it.
 - Add a "Figure provenance" section to the lab README or wiki: install, `backstamp.save`,
   `inputs=`, `backstamp show`.
+- Decided at the start of Phase 5:
+  - Consumers pin `backstamp~=0.1.0` from PyPI: it takes 0.1.x fixes, and stops before a
+    0.2 that may change the API.
+  - The lab section goes in `hypnose-helpers`' README.
+  - `read_figure_metadata` is dropped: nothing imported the two re-exports.
+  - The maintainer tags and uploads `0.1.0` after the phase. `pypi-release` then reaches
+    `main` by pull request, before the consumers are pushed.
+- Results, 2026-11-02:
+  - backstamp `0.1.0`. 101 tests pass in `backstamp` and `backstamp-py39`, run directly
+    and with pytest.
+  - `hypnose-helpers` `0.2.0`: shims removed; depends on `backstamp~=0.1.0`;
+    `test_save.py` reads with `backstamp.read`. README: "Figure provenance". All tests pass
+    in `hypnose-behavior`.
+  - `hypnose-behavior`: `io/save.py`, `io/save_results.py` and `qc/figure_provenance.py`
+    import `backstamp.provenance`, and `--break-chain` sets its `MAX_CHAIN`.
+    `backstamp~=0.1.0` in `pyproject.toml`. `DECISIONS.md` §19 names
+    `backstamp.provenance.provenance()`.
+  - `hypnose-somnotate`: `io/save.py` imports `backstamp.provenance`. `environment.yml`
+    gains `backstamp~=0.1.0` and `-e ../hypnose-helpers`, which `io/save.py` already
+    imported.
+  - `qc/fixtures/env.json` records neither package: unchanged.
+  - Gate GREEN: 36 cases saved 82 figures, each naming its plotter; the other 4 never
+    save. `--break-chain` and `--break-skip-modules` RED as intended.
+  - A gate run while the ceph mount was failing raised in 5 cases and saved nothing in 29
+    others. A failing mount shows as missing saves, not only as errors.
+  - The gate replaces `save_figure` with a recorder, so it checks `io/save.py`'s
+    `skip_modules`, not the `hypnose-helpers` wrapper's. `test_save.py` covers that one.
+  - `regression.py` not run: the shim made the old name the same module, so the import
+    change runs the same function, and `regression.py` never reads `manifest.json`.
+  - A figure saved through each consumer's `io/save.py` reads back with `backstamp show`,
+    naming the plotting function. `hypnose-somnotate` was checked from source in the
+    `hypnose-behavior` env; its own env lacks both packages.
+  - `origin/main` holds PR #1 (`io/layout.py`), which `pypi-release` does not. They merge
+    without conflicts. PR #1 stops `list_sessions` raising on a repeated date; sessions
+    that loaded before resolve the same.
+  - `0.1.0` is on PyPI, uploaded 2026-11-03. Its files match the tree tagged `v0.1.0`.
+  - Left for the maintainer: the pull request, then push the consumers. Install both
+    packages into `hypnose-somnotate` and read back one saved figure.
 
 ### Phase 6: Public release
 

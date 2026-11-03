@@ -19,7 +19,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.ticker import LogLocator, MaxNLocator  # noqa: E402
 
-from hypnose_helpers.viz.metadata import read_figure_metadata  # noqa: E402
+from backstamp import read  # noqa: E402
 from hypnose_helpers.viz.save import save_figure  # noqa: E402
 from hypnose_helpers.viz.styles import use_style  # noqa: E402
 
@@ -76,12 +76,12 @@ def test_record_names_the_plotter_and_the_file_keeps_its_tags():
 
     with tempfile.TemporaryDirectory() as tmp:
         path = plot_accuracy(tmp)
-        record = read_figure_metadata(path)
+        record = read(path)
     assert path == Path(tmp) / "sub" / "accuracy_sub-040_066_date-20251124.pdf", path
-    assert record["status"] == "ok", record
-    assert record["call"]["function"] == "plot_accuracy", record
-    assert record["inputs"] == {"subject": [40, 66], "date": ["20251124"]}, record
-    assert record["title"] == "accuracy sub-40,66 20251124", record
+    assert record.status == "ok", record
+    assert record.call["function"] == "plot_accuracy", record
+    assert record.inputs == {"subject": [40, 66], "date": ["20251124"]}, record
+    assert record.title == "accuracy sub-40,66 20251124", record
 
 
 if __name__ == "__main__":

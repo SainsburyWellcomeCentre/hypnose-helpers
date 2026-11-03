@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hypnose-helpers"
-version = "0.1.0"
+version = "0.2.0"
 description = "Modality-agnostic helpers shared across the Hypnose repos: data-location resolution, sub-XXX/ses-YY layout walking, selector parsing, figure styles and saving."
 readme = "README.md"
 # Matches backstamp's floor.
@@ -17,7 +17,7 @@ dependencies = [
     "pandas",
     "matplotlib",
     "pyyaml",
-    "backstamp @ git+https://github.com/Joschua21/backstamp@main",
+    "backstamp~=0.1.0",
 ]
 
 [project.optional-dependencies]
