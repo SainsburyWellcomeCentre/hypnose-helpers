@@ -646,14 +646,13 @@ posted as a preprint, need not carry it (see Risks).
   - `regression.py` not run: the shim made the old name the same module, so the import
     change runs the same function, and `regression.py` never reads `manifest.json`.
   - A figure saved through each consumer's `io/save.py` reads back with `backstamp show`,
-    naming the plotting function. `hypnose-somnotate` was checked from source in the
-    `hypnose-behavior` env; its own env lacks both packages.
-  - `origin/main` holds PR #1 (`io/layout.py`), which `pypi-release` does not. They merge
-    without conflicts. PR #1 stops `list_sessions` raising on a repeated date; sessions
-    that loaded before resolve the same.
+    naming the plotting function. Checked in each consumer's own env: `hypnose-somnotate`
+    has backstamp from PyPI, its numpy, pandas and scikit-learn pins unchanged.
+  - PR #1 (`io/layout.py`) was on `main` but not on `pypi-release`; the two merged without
+    conflicts. PR #1 stops `list_sessions` raising on a repeated date; sessions that
+    loaded before resolve the same.
   - `0.1.0` is on PyPI, uploaded 2026-11-03. Its files match the tree tagged `v0.1.0`.
-  - Left for the maintainer: the pull request, then push the consumers. Install both
-    packages into `hypnose-somnotate` and read back one saved figure.
+  - `pypi-release` merged into `main` (PR #2); both consumers pushed.
 
 ### Phase 6: Public release
 
